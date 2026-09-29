@@ -117,6 +117,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miOpen">Open…</button>
   <button role="menuitem" id="miSaveAs">Save as…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
+  <button role="menuitem" id="miStamp">Page numbers & watermark…</button>
   <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <hr />
   <button role="menuitem" id="miSpread">Two-page view</button>
@@ -506,6 +507,45 @@ async function extractDialog() {
     toast(`Extracted ${idx.length} page${idx.length === 1 ? "" : "s"}`);
   } catch (e: any) { toast(e.message, "error"); }
 }
+async function stampDialog() {
+  if (!doc) return;
+  const saved = JSON.parse(localStorage.getItem("leaflark.stamp") || "{}");
+  const field = (label: string, input: HTMLElement) => el("label", { className: "form-row" }, [el("span", { textContent: label }), input]);
+  const select = (opts: [string, string][], value: string) => {
+    const sel = el("select", { className: "text-input" }) as HTMLSelectElement;
+    for (const [v, l] of opts) sel.append(el("option", { value: v, textContent: l }));
+    sel.value = value;
+    return sel;
+  };
+  const numOn = el("input", { type: "checkbox", checked: saved.numOn ?? true }) as HTMLInputElement;
+  const pos = select([["bottom-center", "Bottom centre"], ["bottom-right", "Bottom right"], ["bottom-left", "Bottom left"], ["top-center", "Top centre"], ["top-right", "Top right"]], saved.pos ?? "bottom-center");
+  const fmt = select([["n", "1"], ["page-n", "Page 1"], ["page-n-of-total", "Page 1 of N"], ["n-slash-total", "1 / N"]], saved.fmt ?? "n");
+  const start = el("input", { type: "number", min: "1", value: String(saved.start ?? 1), className: "text-input" }) as HTMLInputElement;
+  const skipFirst = el("input", { type: "checkbox", checked: !!saved.skipFirst }) as HTMLInputElement;
+  const wmOn = el("input", { type: "checkbox", checked: !!saved.wmOn }) as HTMLInputElement;
+  const wmText = el("input", { className: "text-input", value: saved.wmText ?? "CONFIDENTIAL", maxLength: 60 }) as HTMLInputElement;
+  const wmOpacity = el("input", { type: "range", min: "0.05", max: "0.6", step: "0.05", value: String(saved.wmOpacity ?? 0.15) }) as HTMLInputElement;
+  const numBox = el("fieldset", { className: "form-group" }, [el("legend", {}, [el("label", { className: "chk-lg" }, [numOn, "Page numbers"])]), field("Position", pos), field("Format", fmt), field("Start at", start), el("label", { className: "chk-lg" }, [skipFirst, "Skip first page (cover)"])]);
+  const wmBox = el("fieldset", { className: "form-group" }, [el("legend", {}, [el("label", { className: "chk-lg" }, [wmOn, "Watermark"])]), field("Text", wmText), field("Opacity", wmOpacity)]);
+  const sync = () => {
+    numBox.querySelectorAll<HTMLInputElement | HTMLSelectElement>("select, input:not([type=checkbox]), .form-group > label input").forEach((i) => (i.disabled = !numOn.checked));
+    [wmText, wmOpacity].forEach((i) => (i.disabled = !wmOn.checked));
+  };
+  numOn.onchange = wmOn.onchange = sync;
+  sync();
+  const body = el("div", { className: "stamp-form" }, [numBox, wmBox, el("p", { className: "hint-text", textContent: "Added to every page’s content, so all viewers and printers show it. You can undo this." })]);
+  const ok = await showDialog({ title: "Page numbers & watermark", body, buttons: [{ label: "Cancel", value: false }, { label: "Apply", value: true, primary: true }] });
+  if (!ok || !doc || (!numOn.checked && !(wmOn.checked && wmText.value.trim()))) return;
+  const opts = { numOn: numOn.checked, pos: pos.value, fmt: fmt.value, start: Math.max(1, parseInt(start.value, 10) || 1), skipFirst: skipFirst.checked, wmOn: wmOn.checked, wmText: wmText.value, wmOpacity: +wmOpacity.value };
+  localStorage.setItem("leaflark.stamp", JSON.stringify(opts));
+  const { stampPages } = await import("./stamp");
+  mutatePages(opts.numOn && opts.wmOn ? "Adding page numbers and watermark" : opts.numOn ? "Adding page numbers" : "Adding watermark", (b) => stampPages(b, {
+    ...crypt(),
+    numbers: opts.numOn ? { position: opts.pos as any, format: opts.fmt as any, start: opts.start, skipFirst: opts.skipFirst } : undefined,
+    watermark: opts.wmOn ? { text: opts.wmText, opacity: opts.wmOpacity } : undefined,
+  }));
+}
+
 function compressRanges(idx: number[]): string {
   const s = [...idx].sort((a, b) => a - b).map((i) => i + 1);
   const parts: string[] = [];
@@ -1012,6 +1052,7 @@ on("#miExtract", extractDialog);
 on("#miMerge", () => doc && insertPdfAt(doc.pdf.numPages));
 on("#miSpread", () => { viewer.spreadMode = viewer.spreadMode === 1 ? 0 : 1; });
 on("#miProps", showProperties);
+on("#miStamp", stampDialog);
 on("#miShortcuts", showShortcuts);
 on("#miClose", closeDocument);
 on("#pgRotL", () => rotatePages(thumbs.selected(), -90));

@@ -7,7 +7,7 @@ Leaflark's baseline answers the first three by design (free, local, unlimited, n
 ## Next
 1. **Edit existing text** (most requested gap): click a text run to replace it (cover + re-typeset with matching font where embeddable).
 2. **Redaction** that really removes content (not just a black box).
-3. **Page numbers / headers / watermark** stamping.
+3. ~~Page numbers / watermark~~ (done 2026-09-29); headers/footers with custom text and Bates numbering next.
 4. **Compress** (image downsampling) and **OCR** for scanned PDFs (tesseract.js, lazy-loaded).
 5. Merge AcroForm fields when combining forms.
 6. End-to-end tests (Playwright) for the workflows in docs/TESTING.md; run in CI.

@@ -11,6 +11,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 - **Annotate** — highlight text (or freehand), add text, draw, insert images, and sign — draw or type a signature once, keep it on your device, and place it with a click. Annotations are saved as standard PDF annotations that open in Acrobat, Preview, Chrome, Firefox, etc., and stay editable.
 - **Fill forms** — fill AcroForm fields (text, checkboxes, radio buttons, dropdowns) and save the values into the file.
 - **Combine & convert** — open or drop several PDFs and JPEG/PNG images at once to combine them into one PDF.
+- **Page numbers & watermarks** — stamped into the page content (correct on rotated pages), with several formats and a cover-page option.
 - **Organize pages** — drag thumbnails to reorder, rotate, delete, insert blank pages, insert or append other PDFs, and extract a page range to a new PDF. Forms and annotations survive page edits.
 - **Undo/redo** for both annotations and page edits.
 - **Save in place** where the browser supports the File System Access API (Chrome, Edge), otherwise download. Unsaved-change protection.
