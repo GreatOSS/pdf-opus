@@ -104,6 +104,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Highlight + text box, checked in Poppler
 - tracemonkey p1: highlighted the title, added text box “Reviewed ✓ ok”, saved. Poppler: highlight OK. Text box: pdf.js writes no appearance stream when the text has non-WinAnsi characters, so Poppler rebuilt it and dropped “✓” (other viewers may not show the box at all). ASCII text boxes get a proper appearance. Now: a one-time warning when leaving a text box with such characters (verified: one toast, none for ASCII). Real fix = embed a Unicode font (roadmap).
 
+### 2026-09-29 — Drop image + PDF together
+- Dropped a PNG and w9.pdf in one drag onto the start screen → “Combined.pdf”, 7 pages (image page first, then w9's 6), unsaved marker and “save to keep” toast. OK.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
