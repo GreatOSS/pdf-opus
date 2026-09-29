@@ -107,6 +107,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Drop image + PDF together
 - Dropped a PNG and w9.pdf in one drag onto the start screen → “Combined.pdf”, 7 pages (image page first, then w9's 6), unsaved marker and “save to keep” toast. OK.
 
+### 2026-09-29 — Touch drawing (390×780)
+- tracemonkey, Draw tool, one-finger diagonal stroke (CDP touch): stroke drawn, page did not scroll, Undo enabled. OK. Polish idea: the Draw options panel (colours / thickness / opacity) takes ~20% of the phone screen until Done.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
