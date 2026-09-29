@@ -117,3 +117,24 @@ describe("merge / images", () => {
     expect((await PDFDocument.load(out)).getPageCount()).toBe(1);
   });
 });
+
+describe("form fields when combining", () => {
+  async function formPdf() {
+    const d = await PDFDocument.create();
+    const page = d.addPage([300, 300]);
+    const f = d.getForm().createTextField("name");
+    f.setText("x");
+    f.addToPage(page, { x: 10, y: 10, width: 100, height: 20 });
+    return d.save();
+  }
+  it("registers copied fields in the AcroForm and de-duplicates names", async () => {
+    const form = await formPdf();
+    const out = await mergeDocuments([form, form]);
+    const names = (await PDFDocument.load(out)).getForm().getFields().map((f) => f.getName());
+    expect(names).toEqual(["name", "name (2)"]);
+  });
+  it("registers fields of inserted documents", async () => {
+    const out = await insertDocument(await makePdf([100]), await formPdf(), 1);
+    expect((await PDFDocument.load(out)).getForm().getFields().map((f) => f.getName())).toEqual(["name"]);
+  });
+});

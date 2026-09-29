@@ -1,7 +1,7 @@
 // Page-level document operations (reorder, rotate, delete, insert, extract).
 // All operations take and return raw PDF bytes so they compose with pdf.js'
 // saveDocument() output, which already contains annotations and form values.
-import { PDFArray, PDFDocument, PDFName, PDFNumber, PDFRef, degrees } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFObjectCopier, PDFPage, PDFRef, PDFString, degrees } from "@cantoo/pdf-lib";
 
 export interface PagePlanEntry {
   /** Zero-based index of the page in the source document. */
@@ -85,6 +85,7 @@ export async function insertDocument(bytes: Uint8Array, other: Uint8Array, at: n
   const copied = await doc.copyPages(src, src.getPageIndices());
   const pos = Math.max(0, Math.min(at, doc.getPageCount()));
   copied.forEach((p, i) => doc.insertPage(pos + i, p));
+  adoptFormFields(doc, src, copied);
   return save(doc, password);
 }
 
@@ -139,6 +140,78 @@ export async function mergeDocuments(docs: Uint8Array[]): Promise<Uint8Array> {
     }
     const pages = await out.copyPages(src, src.getPageIndices());
     pages.forEach((p) => out.addPage(p));
+    adoptFormFields(out, src, pages);
   }
   return out.save();
+}
+
+/**
+ * After copying pages that contain form widgets into `dest`, register their
+ * fields in dest's AcroForm so every viewer treats them as fillable. Root
+ * fields whose names clash with existing ones get a " (2)"-style suffix so the
+ * two forms don't share values.
+ */
+export function adoptFormFields(dest: PDFDocument, src: PDFDocument, pages: PDFPage[]) {
+  const ctx = dest.context;
+  const roots = new Map<string, PDFRef>();
+  for (const page of pages) {
+    const annots = page.node.Annots();
+    if (!annots) continue;
+    for (let i = 0; i < annots.size(); i++) {
+      let ref = annots.get(i);
+      if (!(ref instanceof PDFRef)) continue;
+      const obj = ctx.lookup(ref);
+      if (!(obj instanceof PDFDict) || obj.get(PDFName.of("Subtype")) !== PDFName.of("Widget")) continue;
+      let dict: PDFDict = obj;
+      for (let parent = dict.get(PDFName.of("Parent")); parent instanceof PDFRef; parent = dict.get(PDFName.of("Parent"))) {
+        const pd = ctx.lookup(parent);
+        if (!(pd instanceof PDFDict)) break;
+        ref = parent;
+        dict = pd;
+      }
+      roots.set(ref.toString(), ref as PDFRef);
+    }
+  }
+  if (!roots.size) return;
+  let acro = dest.catalog.lookupMaybe(PDFName.of("AcroForm"), PDFDict);
+  if (!acro) {
+    acro = ctx.obj({ Fields: [] }) as PDFDict;
+    dest.catalog.set(PDFName.of("AcroForm"), ctx.register(acro));
+  }
+  // Stale XFA data would override the combined AcroForm in XFA-aware viewers.
+  acro.delete(PDFName.of("XFA"));
+  let fields = acro.lookupMaybe(PDFName.of("Fields"), PDFArray);
+  if (!fields) { fields = ctx.obj([]) as PDFArray; acro.set(PDFName.of("Fields"), fields); }
+  const nameOf = (d: PDFDict) => { const t = d.get(PDFName.of("T")); return t instanceof PDFString || t instanceof PDFHexString ? t.decodeText() : ""; };
+  const taken = new Set<string>();
+  const existing = new Set<string>();
+  for (let i = 0; i < fields.size(); i++) {
+    const f = fields.get(i);
+    existing.add(f.toString());
+    const d = f instanceof PDFRef ? ctx.lookup(f) : f;
+    if (d instanceof PDFDict) taken.add(nameOf(d));
+  }
+  for (const ref of roots.values()) {
+    if (existing.has(ref.toString())) continue;
+    const d = ctx.lookup(ref) as PDFDict;
+    const name = nameOf(d);
+    if (name && taken.has(name)) {
+      let n = 2;
+      while (taken.has(`${name} (${n})`)) n++;
+      d.set(PDFName.of("T"), PDFHexString.fromText(`${name} (${n})`));
+      taken.add(`${name} (${n})`);
+    } else if (name) taken.add(name);
+    fields.push(ref);
+  }
+  // Carry over default appearance/resources so text fields render in other viewers.
+  const srcAcro = src.catalog.lookupMaybe(PDFName.of("AcroForm"), PDFDict);
+  if (srcAcro) {
+    for (const key of ["DA", "DR"]) {
+      const k = PDFName.of(key);
+      if (!acro.get(k) && srcAcro.get(k)) {
+        const v = srcAcro.get(k)!;
+        acro.set(k, dest === src ? v : PDFObjectCopier.for(src.context, ctx).copy(v));
+      }
+    }
+  }
 }

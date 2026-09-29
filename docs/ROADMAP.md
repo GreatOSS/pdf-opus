@@ -9,7 +9,7 @@ Leaflark's baseline answers the first three by design (free, local, unlimited, n
 2. **Redaction** that really removes content (not just a black box).
 3. ~~Page numbers / watermark~~ (done 2026-09-29); headers/footers with custom text and Bates numbering next.
 4. **Compress** (image downsampling) and **OCR** for scanned PDFs (tesseract.js, lazy-loaded).
-5. Merge AcroForm fields when combining forms.
+5. ~~Merge AcroForm fields when combining forms~~ (done 2026-09-29).
 6. End-to-end tests (Playwright) for the workflows in docs/TESTING.md; run in CI.
 7. Recent files list (IndexedDB, opt-in), presentation mode, print cross-browser verification.
 8. Desktop packaging (Tauri) for native file association — local builds only while the repo is private.
