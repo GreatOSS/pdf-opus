@@ -59,7 +59,9 @@ export function setupRedact(ctx: Ctx) {
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       ghost.remove();
+      if (ev.type === "pointercancel") return;
       const cx = Math.max(0, Math.min(pageEl.clientWidth, ev.clientX - ox)), cy = Math.max(0, Math.min(pageEl.clientHeight, ev.clientY - oy));
       if (Math.abs(cx - sx) < 4 || Math.abs(cy - sy) < 4) return;
       const [px1, py1] = view.viewport.convertToPdfPoint(sx, sy);
@@ -69,6 +71,7 @@ export function setupRedact(ctx: Ctx) {
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   }, true);
 
   return {

@@ -70,3 +70,16 @@ describe("applyRedactions", () => {
     expect((await PDFDocument.load(bytes)).getPage(0).node.Annots()?.size() ?? 0).toBe(0);
   });
 });
+
+describe("metadata scrub", () => {
+  it("clears document info and XMP when asked", async () => {
+    const { d } = await sample();
+    d.setAuthor("Jane Secret");
+    d.setTitle("Merger plan");
+    const { bytes } = await applyRedactions(await d.save(), [{ pageIndex: 0, rect: [0, 0, 1, 1] }], { scrubMetadata: true });
+    const back = await PDFDocument.load(bytes, { updateMetadata: false });
+    expect(back.getAuthor()).toBeUndefined();
+    expect(back.getTitle()).toBeUndefined();
+    expect(Buffer.from(bytes).toString("latin1")).not.toContain("Jane Secret");
+  });
+});

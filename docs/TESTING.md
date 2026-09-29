@@ -62,6 +62,15 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | **New:** Redact tool on W-9 header (drag, ×-remove mark, Apply → confirm) | 53 characters removed from the file, black box drawn, rest of page intact; undoable |
 | Edit text now also removes the old glyphs | Verified by e2e (old string no longer extractable) |
 
+
+## 2026-09-29 (session 5)
+
+| Workflow | Result |
+|---|---|
+| Phone width 375px: 9 tools in bottom bar, Redact options | Fit OK |
+| Redact with a finger drag (CDP touch events, e2e) | **Fixed:** the browser treated the drag as a scroll and cancelled the pointer, leaving a stuck half-drawn mark → `touch-action: none` while redacting + pointercancel cleanup |
+| Redact with “Also remove document properties” on tracemonkey | 60 chars removed; Info dictionary and XMP gone |
+
 ### Known gaps / next
 - Redaction does not yet touch text inside Form XObjects or pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: non-Latin characters outside WinAnsi become “?”; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).

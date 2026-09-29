@@ -782,15 +782,17 @@ const redact = setupRedact({
 async function applyRedactionMarks() {
   const marks = redact.marks();
   if (!marks.length || !doc) return;
-  const ok = await confirmDialog({
+  const scrub = el("input", { type: "checkbox" }) as HTMLInputElement;
+  const ok = await showDialog({
     title: "Apply redactions?",
     message: `Text and annotations in ${marks.length === 1 ? "the marked area" : `the ${marks.length} marked areas`} will be removed and blacked out. You can still undo until you close the file. Images under the areas are covered, not erased.`,
-    okLabel: "Redact", danger: true,
+    body: el("label", { className: "chk-lg" }, [scrub, "Also remove document properties (author, title, etc.)"]),
+    buttons: [{ label: "Cancel", value: false }, { label: "Redact", value: true, primary: true, danger: true }],
   });
   if (!ok) return;
   let glyphs = 0;
   const done = await mutatePages("Redacting", async (b) => {
-    const r = await (await import("./redact")).applyRedactions(b, marks, crypt());
+    const r = await (await import("./redact")).applyRedactions(b, marks, { ...crypt(), scrubMetadata: scrub.checked });
     glyphs = r.glyphs;
     return r.bytes;
   }, viewer.currentPageNumber, true);

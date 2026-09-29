@@ -341,9 +341,15 @@ const overlaps = (a: Rect, b: Rect) => a[0] < b[0] + b[2] && b[0] < a[0] + a[2] 
  * Permanently redact areas: remove the text underneath, delete overlapping
  * annotations/form widgets, and paint the areas black.
  */
-export async function applyRedactions(bytes: Uint8Array, marks: RedactionMark[], { password = "" }: { password?: string } = {}): Promise<{ bytes: Uint8Array; glyphs: number }> {
+export async function applyRedactions(bytes: Uint8Array, marks: RedactionMark[], { password = "", scrubMetadata = false }: { password?: string; scrubMetadata?: boolean } = {}): Promise<{ bytes: Uint8Array; glyphs: number }> {
   const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
   let glyphs = 0;
+  if (scrubMetadata) {
+    // Clear the Info dictionary and drop XMP metadata, which often repeats author/title.
+    const info = doc.context.trailerInfo.Info;
+    if (info) { const d = doc.context.lookup(info); if (d instanceof PDFDict) for (const k of d.keys()) d.delete(k); }
+    doc.catalog.delete(PDFName.of("Metadata"));
+  }
   const byPage = new Map<number, Rect[]>();
   for (const m of marks) byPage.set(m.pageIndex, [...(byPage.get(m.pageIndex) ?? []), m.rect]);
   for (const [idx, rects] of byPage) {
