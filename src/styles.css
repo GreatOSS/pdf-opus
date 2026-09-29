@@ -2,7 +2,7 @@
   --bg: #f3f4f6; --surface: #ffffff; --surface-2: #f8f9fa; --border: #e2e4e8; --text: #1d2125; --muted: #646b73;
   --accent: #1f6f5c; --accent-hover: #185a4b; --accent-soft: #dcefe8; --danger: #c62828; --stage: #e6e8ec;
   --shadow: 0 1px 2px rgb(0 0 0 / .06), 0 4px 16px rgb(0 0 0 / .08);
-  --toolbar-h: 52px; --sidebar-w: 184px; --radius: 8px;
+  --toolbar-h: 52px; --sidebar-w: 208px; --radius: 8px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
   color: var(--text); background: var(--bg); color-scheme: light;
 }
@@ -59,8 +59,12 @@ body.has-doc .no-doc-only { display: none; }
 
 /* Workspace */
 .workspace { position: relative; height: calc(100% - var(--toolbar-h)); display: flex; }
-.ll-sidebar { width: 0; overflow: hidden; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: width .15s ease; flex: none; }
+.ll-sidebar { position: relative; width: 0; overflow: hidden; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: width .15s ease; flex: none; }
 body.sidebar-open.has-doc .ll-sidebar { width: var(--sidebar-w); }
+body.resizing-sidebar .ll-sidebar { transition: none; }
+body.resizing-sidebar { cursor: col-resize; user-select: none; }
+.sidebar-resizer { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 3; }
+.sidebar-resizer:hover, body.resizing-sidebar .sidebar-resizer { background: linear-gradient(to right, transparent 2px, var(--accent) 2px, var(--accent) 4px, transparent 4px); }
 .sidebar-tabs { display: flex; padding: 6px; gap: 4px; border-bottom: 1px solid var(--border); flex: none; }
 .sidebar-tabs button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; height: 30px; border: 0; background: transparent; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
 .sidebar-tabs button svg { width: 16px; height: 16px; }
@@ -71,8 +75,8 @@ body.sidebar-open.has-doc .ll-sidebar { width: var(--sidebar-w); }
 .page-actions svg { width: 17px; height: 17px; }
 .sel-info { flex: 1; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
 .thumbs { flex: 1; overflow-y: auto; padding: 12px 0 24px; outline: none; }
-.thumb { position: relative; width: 132px; margin: 0 auto 14px; cursor: pointer; border-radius: 4px; }
-.thumb-img { width: 132px; background: #fff; box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgb(0 0 0 / .15); border-radius: 2px; overflow: hidden; }
+.thumb { position: relative; width: clamp(96px, calc(var(--sidebar-w) - 56px), 360px); margin: 0 auto 14px; cursor: pointer; border-radius: 4px; }
+.thumb-img { width: 100%; background: #fff; box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgb(0 0 0 / .15); border-radius: 2px; overflow: hidden; }
 .thumb-img canvas { width: 100%; height: 100%; display: block; }
 .thumb-label { display: block; text-align: center; font-size: 12px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .thumb.current .thumb-label { color: var(--text); font-weight: 600; }
@@ -87,13 +91,14 @@ body.sidebar-open.has-doc .ll-sidebar { width: var(--sidebar-w); }
 .thumb.drop-before::before, .thumb.drop-after::after { content: ""; position: absolute; left: -8px; right: -8px; height: 3px; background: var(--accent); border-radius: 2px; }
 .thumb.drop-before::before { top: -9px; }
 .thumb.drop-after::after { bottom: -9px; }
-.outline { overflow: auto; padding: 8px 4px; flex: 1; font-size: 13px; }
+.outline { overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; padding: 8px 4px; flex: 1; font-size: 13px; }
 .outline ul { list-style: none; margin: 0; padding: 0; }
 .outline li > ul { display: none; padding-left: 14px; }
 .outline li.open > ul { display: block; }
 .outline-row { display: flex; align-items: flex-start; }
 .outline a { color: var(--text); text-decoration: none; padding: 4px 6px; border-radius: 4px; flex: 1; line-height: 1.35; }
 .outline a:hover { background: var(--surface-2); }
+.outline a.current { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .twisty, .twisty-space { width: 20px; height: 24px; flex: none; }
 .twisty { border: 0; background: transparent; cursor: pointer; color: var(--muted); }
 .twisty::before { content: "▸"; display: inline-block; transition: transform .1s; }

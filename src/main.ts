@@ -87,6 +87,7 @@ $("#app").innerHTML = `
       <div id="thumbs" class="thumbs" role="listbox" aria-multiselectable="true" aria-label="Pages" tabindex="0"></div>
     </div>
     <div id="outlinePanel" class="panel" hidden><div id="outline" class="outline"></div></div>
+    <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
   </aside>
   <main class="stage">
     <div id="viewerContainer" class="viewer-container" tabindex="0"><div id="viewer" class="pdfViewer"></div></div>
@@ -707,6 +708,7 @@ const pageInput = $("#pageInput") as HTMLInputElement;
 eventBus.on("pagechanging", ({ pageNumber }: { pageNumber: number }) => {
   pageInput.value = viewer.currentPageLabel ?? String(pageNumber);
   thumbs.setCurrent(pageNumber);
+  highlightOutline(pageNumber);
 });
 pageInput.addEventListener("change", () => {
   if (!doc) return;
@@ -762,7 +764,7 @@ async function loadOutline(pdf: PDFDocumentProxy) {
       const row = el("div", { className: "outline-row" });
       if (it.items?.length) {
         const tw = el("button", { className: "twisty", type: "button", ariaLabel: "Expand", ariaExpanded: "false" }) as HTMLButtonElement;
-        tw.onclick = () => { const open = li.classList.toggle("open"); tw.ariaExpanded = String(open); };
+        tw.onclick = () => { const open = li.classList.toggle("open"); tw.ariaExpanded = String(open); delete li.dataset.auto; };
         row.append(tw);
       } else row.append(el("span", { className: "twisty-space" }));
       const a = el("a", { href: "#", textContent: it.title || "(untitled)" }) as HTMLAnchorElement;
@@ -783,6 +785,40 @@ async function loadOutline(pdf: PDFDocumentProxy) {
   const tree = build(outline);
   tree.setAttribute("role", "tree");
   root.append(tree);
+  // Resolve each entry's page so the current section can be highlighted while reading.
+  outlinePages = [];
+  const links = [...root.querySelectorAll<HTMLAnchorElement>("a")];
+  const flat: any[] = [];
+  const walk = (items: any[]) => items.forEach((it) => { flat.push(it); if (it.items?.length) walk(it.items); });
+  walk(outline);
+  await Promise.all(flat.map(async (it, i) => {
+    try {
+      const dest = typeof it.dest === "string" ? await pdf.getDestination(it.dest) : it.dest;
+      if (!Array.isArray(dest)) return;
+      const page = typeof dest[0] === "object" && dest[0] ? (await pdf.getPageIndex(dest[0])) + 1 : Number.isInteger(dest[0]) ? dest[0] + 1 : 0;
+      if (page) outlinePages.push({ page, order: i, link: links[i] });
+    } catch { /* unresolved destinations are simply not highlighted */ }
+  }));
+  outlinePages.sort((a, b) => a.order - b.order);
+  if (doc?.pdf === pdf) highlightOutline(viewer.currentPageNumber);
+}
+let outlinePages: { page: number; order: number; link: HTMLAnchorElement }[] = [];
+function highlightOutline(page: number) {
+  let best: (typeof outlinePages)[number] | undefined;
+  for (const e of outlinePages) if (e.page <= page && (!best || e.page >= best.page)) best = e;
+  $("#outline").querySelector("a.current")?.classList.remove("current");
+  if (!best) return;
+  best.link.classList.add("current");
+  // Reveal the entry by expanding its ancestors; collapse sections we auto-expanded earlier.
+  const chain = new Set<Element>();
+  for (let li = best.link.closest("li")?.parentElement?.closest("li"); li; li = li.parentElement?.closest("li")) {
+    chain.add(li);
+    if (!li.classList.contains("open")) { li.classList.add("open"); (li as HTMLElement).dataset.auto = "1"; }
+  }
+  $("#outline").querySelectorAll<HTMLElement>("li[data-auto]").forEach((li) => {
+    if (!chain.has(li)) { li.classList.remove("open"); delete li.dataset.auto; }
+  });
+  if (!$("#outlinePanel").hidden) best.link.scrollIntoView({ block: "nearest" });
 }
 function setTab(which: "pages" | "outline") {
   $("#tabPages").ariaSelected = String(which === "pages");
@@ -856,6 +892,37 @@ function toggleSidebar(force?: boolean) {
 }
 const narrow = matchMedia("(max-width: 820px)");
 toggleSidebar(!narrow.matches && localStorage.getItem("leaflark.sidebar") !== "0");
+
+// Resizable sidebar (drag the edge, or focus it and use ←/→).
+const setSidebarWidth = (w: number) => {
+  const clamped = Math.round(Math.max(150, Math.min(w, Math.min(480, innerWidth * 0.5))));
+  document.documentElement.style.setProperty("--sidebar-w", `${clamped}px`);
+  localStorage.setItem("leaflark.sidebarWidth", String(clamped));
+};
+if (localStorage.getItem("leaflark.sidebarWidth")) setSidebarWidth(+localStorage.getItem("leaflark.sidebarWidth")!);
+{
+  const handle = $("#sidebarResizer");
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing-sidebar");
+    const left = $("#sidebar").getBoundingClientRect().left;
+    const move = (ev: PointerEvent) => setSidebarWidth(ev.clientX - left);
+    const up = () => {
+      document.body.classList.remove("resizing-sidebar");
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+  });
+  handle.addEventListener("dblclick", () => setSidebarWidth(208));
+  handle.addEventListener("keydown", (e) => {
+    const w = $("#sidebar").getBoundingClientRect().width;
+    if (e.key === "ArrowLeft") setSidebarWidth(w - 16);
+    if (e.key === "ArrowRight") setSidebarWidth(w + 16);
+  });
+}
 
 async function showProperties() {
   if (!doc) return;

@@ -11,7 +11,7 @@ interface Callbacks {
   onRotate(indices: number[], delta: number): void;
 }
 
-const THUMB_W = 132;
+const THUMB_W = 200; // render width in CSS px; thumbnails scale with the sidebar
 
 export class Thumbnails {
   private pdf: PDFDocumentProxy | null = null;

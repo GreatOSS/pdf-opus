@@ -34,6 +34,15 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Production build (`vite preview`): open, rotate (lazy-loaded pdf-lib), service worker registers | OK. **Fixed:** relative pdf.js asset URL broke ICC wasm in the worker |
 | Open 3 files at once (W-9 PDF + PNG + 1040 PDF) | Combined into 9 pages, image page sized 600×450pt, 1040 widgets still render |
 
+
+## 2026-09-29 (session 2)
+
+| Workflow | Result |
+|---|---|
+| Outline (mime spec, 3 levels): click entry, expand section | Navigation OK. **Fixed:** 184px sidebar wrapped titles badly and scrolled horizontally → sidebar is now resizable (drag edge / ←→ on handle, persisted), outline wraps cleanly, thumbnails scale with width |
+| Reading position in outline | **New:** current section highlighted and revealed while scrolling; auto-expanded sections collapse again |
+| More → Document properties | OK |
+
 ### Known gaps / next
 - Merged/inserted form pages keep their widgets (fine in Leaflark/pdf.js) but the fields are not added to the target's AcroForm, so other viewers may treat them as non-interactive.
 - No automated end-to-end tests yet (only unit tests for page operations).
