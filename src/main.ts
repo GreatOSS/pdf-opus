@@ -11,7 +11,7 @@ import { parsePageRanges } from "./ranges";
 const organize = () => import("./organize");
 import { Thumbnails } from "./thumbnails";
 import { chooseSignature, dataUrlToFile } from "./signature";
-import { setupEditText } from "./edittext";
+import { setupEditText, unsupportedChars } from "./edittext";
 import { setupRedact } from "./redactui";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
@@ -771,6 +771,15 @@ const editText = setupEditText({
   commit: (edit) => {
     mutatePages("Editing text", async (b) => (await import("./stamp")).applyTextEdits(b, [edit], crypt()), edit.pageIndex + 1, true);
   },
+});
+
+// pdf.js can't write an appearance for text boxes with characters outside the standard
+// fonts, so other PDF apps may drop them. Tell the user when they finish typing.
+container.addEventListener("focusout", (e) => {
+  const box = (e.target as HTMLElement).closest?.(".freeTextEditor");
+  if (!box || box.contains((e as FocusEvent).relatedTarget as Node | null)) return;
+  const bad = unsupportedChars((box.textContent ?? "").replace(/\s/g, " "));
+  if (bad.length) toast(`Other PDF apps may not show ${bad.slice(0, 5).join(" ")} in this text box. If others need to see it, use other characters.`, "error");
 });
 
 // ───────────────────────────── Redaction ─────────────────────────────
