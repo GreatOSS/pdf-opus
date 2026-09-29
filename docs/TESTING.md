@@ -92,6 +92,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Mobile (390×780, touch) signature
 - f1040 on phone layout: page, bottom tool bar OK. Sign dialog: “Remember on this device” checkbox was hidden (mobile rule meant for Find's Aa/Word boxes hid every `.chk`), so signatures were saved without the user seeing the option → rule scoped to the Find bar; re-checked: visible, Find boxes still hidden.
 
+### 2026-09-29 — Keyboard-only sidebar
+- tracemonkey, Tab from toolbar: every thumbnail's Rotate/Delete button was a Tab stop (2 per page) and the thumbnails themselves were unreachable. Now one Tab stop (current page, roving tabindex); ↓↓ → Page 3 + view follows; Delete removes it, Ctrl+Z restores; after scrolling to p6, Tab lands on Page 6. OK.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).

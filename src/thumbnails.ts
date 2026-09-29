@@ -46,9 +46,9 @@ export class Thumbnails {
       const box = el("div", { className: "thumb-img" });
       box.style.aspectRatio = "0.7727";
       const tools = el("div", { className: "thumb-tools" });
-      const rot = el("button", { type: "button", className: "mini-btn", title: "Rotate right", ariaLabel: `Rotate page ${i + 1}`, innerHTML: icons.rotateCw });
+      const rot = el("button", { type: "button", className: "mini-btn", title: "Rotate right", ariaLabel: `Rotate page ${i + 1}`, tabIndex: -1, innerHTML: icons.rotateCw });
       rot.onclick = (e) => { e.stopPropagation(); this.cb.onRotate(this.sel.has(i) ? this.selected() : [i], 90); };
-      const del = el("button", { type: "button", className: "mini-btn", title: "Delete page", ariaLabel: `Delete page ${i + 1}`, innerHTML: icons.trash });
+      const del = el("button", { type: "button", className: "mini-btn", title: "Delete page", ariaLabel: `Delete page ${i + 1}`, tabIndex: -1, innerHTML: icons.trash });
       del.onclick = (e) => { e.stopPropagation(); if (!this.sel.has(i)) this.select(i, "single"); this.cb.onDelete(); };
       tools.append(rot, del);
       item.append(box, tools, el("span", { className: "thumb-label", textContent: String(i + 1) }));
@@ -59,6 +59,9 @@ export class Thumbnails {
       this.io.observe(item);
     }
     this.root.append(frag);
+    // One Tab stop for the whole list (roving tabindex); arrows move between pages.
+    // Per-page buttons stay out of the Tab order: the Delete key and the list toolbar cover them.
+    (this.items[this.current - 1] ?? this.items[0]).tabIndex = 0;
     // Use the first page's proportions as a placeholder for all pages until rendered.
     pdf.getPage(1).then((p) => {
       if (this.pdf !== pdf) return;
@@ -73,11 +76,13 @@ export class Thumbnails {
   selected(): number[] { return [...this.sel].sort((a, b) => a - b); }
 
   setCurrent(page: number) {
-    this.items[this.current - 1]?.classList.remove("current");
+    const prev = this.items[this.current - 1];
+    if (prev) { prev.classList.remove("current"); prev.tabIndex = -1; }
     this.current = page;
     const it = this.items[page - 1];
     if (!it) return;
     it.classList.add("current");
+    it.tabIndex = 0;
     if (!this.root.matches(":hover")) it.scrollIntoView({ block: "nearest" });
   }
 
