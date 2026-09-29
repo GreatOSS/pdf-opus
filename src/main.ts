@@ -864,6 +864,10 @@ eventBus.on("pagechanging", ({ pageNumber }: { pageNumber: number }) => {
   thumbs.setCurrent(pageNumber);
   highlightOutline(pageNumber);
 });
+// Within a page, follow the section at the top of the view as the user scrolls.
+eventBus.on("updateviewarea", ({ location }: { location: { pageNumber: number; top: number } }) => {
+  if (outlinePages.length) highlightOutline(location.pageNumber, location.top);
+});
 pageInput.addEventListener("change", () => {
   if (!doc) return;
   const v = pageInput.value.trim();
@@ -950,17 +954,29 @@ async function loadOutline(pdf: PDFDocumentProxy) {
       const dest = typeof it.dest === "string" ? await pdf.getDestination(it.dest) : it.dest;
       if (!Array.isArray(dest)) return;
       const page = typeof dest[0] === "object" && dest[0] ? (await pdf.getPageIndex(dest[0])) + 1 : Number.isInteger(dest[0]) ? dest[0] + 1 : 0;
-      if (page) outlinePages.push({ page, order: i, link: links[i] });
+      const top = (dest[1] as any)?.name === "XYZ" && typeof dest[3] === "number" ? dest[3] : (dest[1] as any)?.name === "FitH" && typeof dest[2] === "number" ? dest[2] : null;
+      if (page) outlinePages.push({ page, top, order: i, link: links[i] });
     } catch { /* unresolved destinations are simply not highlighted */ }
   }));
   outlinePages.sort((a, b) => a.order - b.order);
   if (doc?.pdf === pdf) highlightOutline(viewer.currentPageNumber);
 }
-let outlinePages: { page: number; order: number; link: HTMLAnchorElement }[] = [];
-function highlightOutline(page: number) {
+let outlinePages: { page: number; top: number | null; order: number; link: HTMLAnchorElement }[] = [];
+/** Highlight the last section that starts above the upper third of the view (`viewTop` is a PDF y). */
+function highlightOutline(page: number, viewTop?: number) {
+  const view = viewer.getPageView(page - 1) as any;
+  const scale = view?.viewport?.scale || 1;
+  const line = viewTop === undefined ? undefined : viewTop - container.clientHeight / scale / 3;
   let best: (typeof outlinePages)[number] | undefined;
-  for (const e of outlinePages) if (e.page <= page && (!best || e.page >= best.page)) best = e;
-  $("#outline").querySelector("a.current")?.classList.remove("current");
+  for (const e of outlinePages) {
+    const onPageAbove = e.page === page && (line === undefined || e.top === null || e.top >= line);
+    if (e.page < page || onPageAbove) best = e;
+  }
+  // Nothing started yet on this page or before: fall back to the page's first section.
+  best ??= outlinePages.find((e) => e.page === page);
+  const prev = $("#outline").querySelector("a.current");
+  if (best && prev === best.link) return; // unchanged: don't fight the user scrolling the panel
+  prev?.classList.remove("current");
   if (!best) return;
   best.link.classList.add("current");
   // Reveal the entry by expanding its ancestors; collapse sections we auto-expanded earlier.
