@@ -502,7 +502,7 @@ async function extractDialog() {
   const sel = thumbs.selected();
   const def = sel.length > 0 && sel.length < doc.pdf.numPages ? compressRanges(sel) : `1-${doc.pdf.numPages}`;
   const n = doc.pdf.numPages;
-  const input = await promptDialog({ title: "Extract pages", message: "Save these pages as a new PDF (e.g. 1-3, 5):", value: def, okLabel: "Extract", validate: (v) => { try { parsePageRanges(v, n); return null; } catch (e: any) { return e.message; } } });
+  const input = await promptDialog({ title: "Extract pages", message: `Save these pages as a new PDF (e.g. 1-3, 5). This document has ${n} page${n === 1 ? "" : "s"}.`, value: def, okLabel: "Extract", validate: (v) => { try { parsePageRanges(v, n); return null; } catch (e: any) { return e.message; } } });
   if (input === null || !doc) return;
   try {
     const idx = parsePageRanges(input, n);
