@@ -137,6 +137,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Tablet widths
 - iPad portrait (834×1112): desktop toolbar didn't fit — More (⋮) pushed off-screen (menu unreachable), sidebar/Open buttons clipped, page number overlapping “of 6”. Toolbar fits only from ~950px. Compact layout (bottom tool bar, overlay sidebar) now applies up to 960px (was 820). Re-checked 834/960/961/1024: no control off-screen, More reachable, Highlight options OK. Then restored page count, zoom menu and Open on 700–960px (room to spare; checked 700/768/834/960).
 
+### 2026-09-29 — Phone landscape (780×360)
+- Sign dialog: “Place signature” was below the screen edge (dialog had to be scrolled while drawing). Pad now shrinks with screen height, same shape → 336×120 pad, buttons in view (bottom 331px); drew a stroke and placed it. Portrait phone and desktop sizes unchanged.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
