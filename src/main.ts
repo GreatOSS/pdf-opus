@@ -7,6 +7,7 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { icons } from "./icons";
 import { applyPagePlan, extractPages, insertBlankPage, insertDocument, parsePageRanges, type PagePlanEntry } from "./organize";
 import { Thumbnails } from "./thumbnails";
+import { chooseSignature, dataUrlToFile } from "./signature";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -508,7 +509,7 @@ eventBus.on("editingstateschanged", ({ details }: any) => {
 
 // ───────────────────────────── Annotation tools ─────────────────────────────
 const toolButtons: Record<string, number> = {
-  toolNone: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.INK,
+  toolNone: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.STAMP,
 };
 const palette = ["#000000", "#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#FFFFFF"];
 const hlPalette = ["#FFF176", "#A5F2B8", "#9CDCFE", "#FFB3D9", "#FFC680"];
@@ -523,11 +524,10 @@ function setMode(mode: number, force = false, toolId?: string) {
   currentMode = mode;
   try { viewer.annotationEditorMode = { mode }; } catch (e) { console.warn(e); }
   syncToolUI(toolId);
-  if (mode === Mode.STAMP) {
+  if (toolId === "toolImage") {
     // Ask for the image right away instead of making users click the page first.
     setTimeout(() => eventBus.dispatch("switchannotationeditorparams", { source: null, type: Param.CREATE, value: null }), 50);
   }
-  if (toolId === "toolSign") setTimeout(() => applyParams("toolSign"), 60);
 }
 eventBus.on("annotationeditormodechanged", ({ mode }: { mode: number }) => {
   if (mode === currentMode) return;
@@ -557,10 +557,6 @@ function applyParams(toolId: string) {
     send(Param.INK_COLOR, p.color ?? "#E53935");
     send(Param.INK_THICKNESS, p.size ?? 3);
     send(Param.INK_OPACITY, p.opacity ?? 1);
-  } else if (toolId === "toolSign") {
-    send(Param.INK_COLOR, p.color ?? "#0B2A6F");
-    send(Param.INK_THICKNESS, p.size ?? 2);
-    send(Param.INK_OPACITY, 1);
   }
 }
 
@@ -571,7 +567,7 @@ function renderToolOptions(toolId: string) {
     toolHighlight: { colors: hlPalette, size: ["Thickness", 8, 24, 12], hint: "Select text to highlight it, or drag anywhere to highlight freely." },
     toolText: { colors: palette, size: ["Size", 6, 72, 14], hint: "Click anywhere on a page to add text." },
     toolDraw: { colors: palette, size: ["Thickness", 1, 20, 3], opacity: true, hint: "Drag on a page to draw." },
-    toolSign: { colors: ["#0B2A6F", "#000000", "#1E88E5"], size: ["Thickness", 1, 6, 2], hint: "Sign by drawing on the page with your mouse, pen or finger." },
+    toolSign: { colors: [], hint: "Click on a page to place your signature. Drag to move it, drag a corner to resize." },
     toolImage: { colors: [], hint: "Choose an image, then drag it where you want. Click on a page to add another." },
   };
   const spec = specs[toolId];
@@ -603,6 +599,11 @@ function renderToolOptions(toolId: string) {
     box.append(el("label", { className: "range" }, ["Opacity", r]));
   }
   box.append(el("span", { className: "tool-hint", textContent: spec.hint }));
+  if (toolId === "toolSign") {
+    const b = el("button", { className: "text-btn", type: "button", textContent: "Change signature…" }) as HTMLButtonElement;
+    b.onclick = () => startSignature();
+    box.append(b);
+  }
   if (toolId === "toolImage") {
     const b = el("button", { className: "text-btn", type: "button", textContent: "Choose image…" }) as HTMLButtonElement;
     b.onclick = () => eventBus.dispatch("switchannotationeditorparams", { source: null, type: Param.CREATE, value: null });
@@ -613,6 +614,48 @@ function renderToolOptions(toolId: string) {
   box.append(done);
   requestAnimationFrame(() => applyParams(toolId));
 }
+
+// ───────────────────────────── Signatures ─────────────────────────────
+let pendingSignature: { file: File; ratio: number } | null = null;
+async function startSignature() {
+  if (!doc) return;
+  const url = await chooseSignature();
+  if (!url) return;
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  pendingSignature = { file: await dataUrlToFile(url), ratio: img.naturalHeight / img.naturalWidth };
+  setMode(Mode.STAMP, true, "toolSign");
+  document.body.classList.add("placing-signature");
+}
+// Place the chosen signature where the user clicks.
+container.addEventListener("pointerdown", (e) => {
+  if (!pendingSignature || activeToolId !== "toolSign" || e.button !== 0) return;
+  const pageEl = (e.target as HTMLElement).closest(".page") as HTMLElement | null;
+  if (!pageEl || (e.target as HTMLElement).closest(".stampEditor, .editToolbar")) return;
+  const view = viewer.getPageView(+pageEl.dataset.pageNumber! - 1) as any;
+  const layer = view?.annotationEditorLayer?.annotationEditorLayer;
+  if (!layer) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const r = layer.div.getBoundingClientRect();
+  const { file, ratio } = pendingSignature;
+  pendingSignature = null;
+  document.body.classList.remove("placing-signature");
+  const cx = e.clientX - r.left, cy = e.clientY - r.top;
+  const ed = layer.createAndAddNewEditor({ offsetX: cx, offsetY: cy }, false, { bitmapFile: file });
+  if (!ed) return;
+  // Size like a real signature (~2.2in wide, smaller on tiny pages) and centre it on the click.
+  const [pw, ph] = ed.pageDimensions as [number, number];
+  const wf = Math.min(158 / pw, 0.45);
+  const hf = (wf * pw * ratio) / ph;
+  ed.width = wf;
+  ed.height = hf;
+  ed.x = Math.max(0, Math.min(1 - wf, cx / r.width - wf / 2));
+  ed.y = Math.max(0, Math.min(1 - hf, cy / r.height - hf / 2));
+  ed.setDims?.();
+  ed.fixAndSetPosition?.();
+}, true);
 
 // ───────────────────────────── Navigation / zoom ─────────────────────────────
 const pageInput = $("#pageInput") as HTMLInputElement;
@@ -863,7 +906,7 @@ on("#pgRotL", () => rotatePages(thumbs.selected(), -90));
 on("#pgRotR", () => rotatePages(thumbs.selected(), 90));
 on("#pgDelete", deleteSelected);
 on("#pgInsert", insertMenu);
-for (const id of Object.keys(toolButtons)) on("#" + id, () => setMode(toolButtons[id], id === "toolImage", id));
+for (const id of Object.keys(toolButtons)) on("#" + id, () => (id === "toolSign" ? startSignature() : setMode(toolButtons[id], id === "toolImage", id)));
 ($("#fileInput") as HTMLInputElement).onchange = (e) => {
   const f = (e.target as HTMLInputElement).files?.[0];
   if (f) openFile(f);

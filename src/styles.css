@@ -176,3 +176,26 @@ kbd { font: 12px ui-monospace, monospace; padding: 2px 6px; border: 1px solid va
 /* pdf.js editor toolbar: keep its mask icons centred inside our button styles. */
 .editToolbar button { line-height: 0; font-size: 0; }
 .editToolbar .basic::before { display: block !important; }
+
+/* Signature dialog */
+.ll-dialog.wide { width: min(620px, calc(100vw - 24px)); }
+.sig-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+.sig-tabs button { border: 0; background: transparent; padding: 6px 14px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+.sig-tabs button[aria-selected="true"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
+.sig-pane { position: relative; }
+.sig-pad { display: block; width: 100%; aspect-ratio: 560 / 200; background: #fff; border: 1px solid var(--border); border-radius: 10px; touch-action: none; cursor: crosshair; }
+.sig-line { position: absolute; left: 8%; right: 8%; bottom: 24%; border-bottom: 1px dashed #b8bcc2; pointer-events: none; }
+.sig-clear { position: absolute; top: 8px; right: 8px; height: 28px; }
+.sig-fonts { display: grid; gap: 6px; margin-top: 10px; }
+.sig-font { text-align: left; font-size: 32px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; background: #fff; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sig-font.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.sig-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.sig-remember { font-size: 13px; }
+.sig-label { margin: 0 0 6px !important; font-size: 13px; font-weight: 600; color: var(--text) !important; }
+.sig-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.sig-cell { position: relative; }
+.sig-item { width: 132px; height: 60px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: #fff; cursor: pointer; }
+.sig-item:hover { border-color: var(--accent); }
+.sig-item img { max-width: 100%; max-height: 100%; }
+.sig-del { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); cursor: pointer; line-height: 1; padding: 0; }
+body.placing-signature .pdfViewer .page { cursor: copy; }

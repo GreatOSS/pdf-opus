@@ -8,7 +8,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 
 - **Read** — smooth continuous scrolling, crisp rendering, fit-to-width/page and pinch/Ctrl+wheel zoom, two-page view, outline (bookmarks), links, dark UI.
 - **Find** — full-text search with live match count, case-sensitive and whole-word options.
-- **Annotate** — highlight text (or freehand), add text, draw, insert images, and hand-sign. Annotations are saved as standard PDF annotations that open in Acrobat, Preview, Chrome, Firefox, etc., and stay editable.
+- **Annotate** — highlight text (or freehand), add text, draw, insert images, and sign — draw or type a signature once, keep it on your device, and place it with a click. Annotations are saved as standard PDF annotations that open in Acrobat, Preview, Chrome, Firefox, etc., and stay editable.
 - **Fill forms** — fill AcroForm fields (text, checkboxes, radio buttons, dropdowns) and save the values into the file.
 - **Organize pages** — drag thumbnails to reorder, rotate, delete, insert blank pages, insert or append other PDFs, and extract a page range to a new PDF. Forms and annotations survive page edits.
 - **Undo/redo** for both annotations and page edits.
@@ -39,4 +39,4 @@ Leaflark has no server component, analytics or network calls beyond loading its 
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE). Leaflark bundles pdf.js (Apache-2.0) and pdf-lib (MIT).
+Apache-2.0. See [LICENSE](LICENSE). Leaflark bundles pdf.js (Apache-2.0), pdf-lib (MIT) and the Great Vibes, Dancing Script and Caveat fonts (SIL OFL 1.1, see `public/fonts`).

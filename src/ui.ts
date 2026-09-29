@@ -25,11 +25,11 @@ export function toast(message: string, kind: "info" | "error" = "info") {
 }
 
 interface DialogButton<T> { label: string; value: T; primary?: boolean; danger?: boolean }
-interface DialogOpts<T> { title: string; message?: string; body?: HTMLElement; buttons: DialogButton<T>[]; onKey?: (d: HTMLDialogElement) => void }
+interface DialogOpts<T> { title: string; message?: string; body?: HTMLElement; buttons: DialogButton<T>[]; wide?: boolean }
 
 export function showDialog<T>(opts: DialogOpts<T>): Promise<T | null> {
   return new Promise((resolve) => {
-    const d = el("dialog", { className: "ll-dialog" }) as HTMLDialogElement;
+    const d = el("dialog", { className: "ll-dialog" + (opts.wide ? " wide" : "") }) as HTMLDialogElement;
     const form = el("form", { method: "dialog" });
     form.append(el("h2", { textContent: opts.title }));
     if (opts.message) form.append(el("p", { textContent: opts.message }));
