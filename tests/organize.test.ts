@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument, PDFName, PDFRef, degrees } from "@cantoo/pdf-lib";
-import { applyPagePlan, extractPages, insertBlankPage, insertDocument, parsePageRanges } from "../src/organize";
+import { applyPagePlan, extractPages, insertBlankPage, insertDocument } from "../src/organize";
+import { parsePageRanges } from "../src/ranges";
 
 async function makePdf(widths: number[]): Promise<Uint8Array> {
   const doc = await PDFDocument.create();

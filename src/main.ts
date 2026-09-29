@@ -5,13 +5,17 @@ import { EventBus, PDFFindController, PDFLinkService, PDFViewer } from "pdfjs-di
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { icons } from "./icons";
-import { applyPagePlan, extractPages, insertBlankPage, insertDocument, parsePageRanges, type PagePlanEntry } from "./organize";
+import type { PagePlanEntry } from "./organize";
+import { parsePageRanges } from "./ranges";
+// pdf-lib is only needed for page edits; load it on first use.
+const organize = () => import("./organize");
 import { Thumbnails } from "./thumbnails";
 import { chooseSignature, dataUrlToFile } from "./signature";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-const ASSETS = import.meta.env.BASE_URL + "pdfjs/";
+// Absolute URL: the pdf.js worker resolves relative URLs against its own location.
+const ASSETS = new URL(import.meta.env.BASE_URL + "pdfjs/", location.href).href;
 const APP_NAME = "Leaflark";
 const { AnnotationEditorType: Mode, AnnotationEditorParamsType: Param } = pdfjs;
 
@@ -366,8 +370,8 @@ async function print() {
 }
 
 // ───────────────────────────── Page operations ─────────────────────────────
-async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uint8Array>, keepPage?: number) {
-  if (!doc) return;
+async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uint8Array>, keepPage?: number): Promise<boolean> {
+  if (!doc) return false;
   const d = doc;
   showLoading(`${label}…`);
   try {
@@ -377,9 +381,11 @@ async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uin
     pageRedo.length = 0;
     prevScale = viewer.currentScaleValue;
     await openBytes(after, d.name, d.handle, { keepPage: keepPage ?? viewer.currentPageNumber, dirty: true, password: d.password });
+    return true;
   } catch (e: any) {
     hideLoading();
     toast(`${label} failed: ${e?.message ?? e}`, "error");
+    return false;
   }
 }
 const crypt = () => ({ password: doc?.password ?? "" });
@@ -389,7 +395,7 @@ function rotatePages(indices: number[], delta: number) {
   if (!doc || !indices.length) return;
   const set = new Set(indices);
   thumbs.selectionAfterReload = indices;
-  mutatePages("Rotating", (b) => applyPagePlan(b, identityPlan().map((e) => (set.has(e.source) ? { ...e, rotate: delta } : e)), crypt()));
+  mutatePages("Rotating", async (b) => (await organize()).applyPagePlan(b, identityPlan().map((e) => (set.has(e.source) ? { ...e, rotate: delta } : e)), crypt()));
 }
 function deleteSelected() {
   if (!doc) return;
@@ -399,7 +405,7 @@ function deleteSelected() {
   const set = new Set(sel);
   const first = Math.min(...sel);
   thumbs.selectionAfterReload = [Math.min(first, doc.pdf.numPages - sel.length - 1)];
-  mutatePages(sel.length > 1 ? `Deleting ${sel.length} pages` : "Deleting page", (b) => applyPagePlan(b, identityPlan().filter((e) => !set.has(e.source)), crypt()), first + 1);
+  mutatePages(sel.length > 1 ? `Deleting ${sel.length} pages` : "Deleting page", async (b) => (await organize()).applyPagePlan(b, identityPlan().filter((e) => !set.has(e.source)), crypt()), first + 1);
 }
 function reorderPages(moving: number[], to: number) {
   if (!doc) return;
@@ -412,13 +418,13 @@ function reorderPages(moving: number[], to: number) {
   const next = [...kept.slice(0, at), ...moved, ...kept.slice(at)];
   if (next.every((e, i) => e.source === i)) return;
   thumbs.selectionAfterReload = moved.map((_, i) => at + i);
-  mutatePages("Moving pages", (b) => applyPagePlan(b, next, crypt()), at + 1);
+  mutatePages("Moving pages", async (b) => (await organize()).applyPagePlan(b, next, crypt()), at + 1);
 }
 async function insertPdfAt(at: number) {
   const f = await pickPdf();
   if (!f) return;
   const other = new Uint8Array(await f.arrayBuffer());
-  mutatePages(`Inserting ${f.name}`, (b) => insertDocument(b, other, at, crypt()), at + 1).then(() => toast(`Inserted “${f.name}”`));
+  mutatePages(`Inserting ${f.name}`, async (b) => (await organize()).insertDocument(b, other, at, crypt()), at + 1).then((ok) => ok && toast(`Inserted “${f.name}”`));
 }
 function pickPdf(): Promise<File | null> {
   const input = $("#insertInput") as HTMLInputElement;
@@ -442,7 +448,7 @@ async function insertMenu() {
       { label: "Pages from a PDF…", value: "pdf", primary: true },
     ],
   });
-  if (choice === "blank") mutatePages("Inserting blank page", (b) => insertBlankPage(b, after, crypt()), after + 1);
+  if (choice === "blank") mutatePages("Inserting blank page", async (b) => (await organize()).insertBlankPage(b, after, crypt()), after + 1);
   else if (choice === "pdf") insertPdfAt(after);
 }
 async function extractDialog() {
@@ -454,7 +460,7 @@ async function extractDialog() {
   if (input === null || !doc) return;
   try {
     const idx = parsePageRanges(input, n);
-    const out = await extractPages(await currentBytes(), idx, crypt());
+    const out = await (await organize()).extractPages(await currentBytes(), idx, crypt());
     const name = doc.name.replace(/\.pdf$/i, "") + ` (pages ${input.replace(/\s+/g, "")}).pdf`;
     const a = el("a", { href: URL.createObjectURL(new Blob([out as BlobPart], { type: "application/pdf" })), download: name }) as HTMLAnchorElement;
     a.click();
@@ -932,7 +938,7 @@ window.addEventListener("drop", (e) => {
   if (doc && target) {
     // Dropping a PDF onto a thumbnail inserts it after that page.
     const at = +target.dataset.index! + 1;
-    pdf.arrayBuffer().then((buf) => mutatePages(`Inserting ${pdf.name}`, (b) => insertDocument(b, new Uint8Array(buf), at, crypt()), at + 1));
+    pdf.arrayBuffer().then((buf) => mutatePages(`Inserting ${pdf.name}`, async (b) => (await organize()).insertDocument(b, new Uint8Array(buf), at, crypt()), at + 1));
   } else openFile(pdf);
 });
 
@@ -1001,6 +1007,11 @@ if (fileParam) {
 }
 updateUndoButtons();
 updateSelectionInfo();
+
+// Offline support for the installed app (production builds only).
+if (import.meta.env.PROD && "serviceWorker" in navigator && location.protocol !== "file:") {
+  navigator.serviceWorker.register(import.meta.env.BASE_URL + "sw.js").catch(() => {});
+}
 
 // Expose for automated UI tests.
 (window as any).leaflark = { get doc() { return doc; }, viewer, eventBus, openBytes };
