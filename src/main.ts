@@ -779,24 +779,39 @@ const redact = setupRedact({
   active: () => activeToolId === "toolRedact",
   onChange: () => { if (activeToolId === "toolRedact") renderToolOptions("toolRedact"); },
 });
+/** Repeat each mark on every page (same position), de-duplicating identical ones. */
+function expandToAllPages(marks: { pageIndex: number; rect: [number, number, number, number] }[], pageCount: number) {
+  const seen = new Set<string>();
+  const out: typeof marks = [];
+  for (const m of marks) for (let p = 0; p < pageCount; p++) {
+    const key = `${p}:${m.rect.map((v) => v.toFixed(2)).join(",")}`;
+    if (!seen.has(key)) { seen.add(key); out.push({ pageIndex: p, rect: m.rect }); }
+  }
+  return out;
+}
 async function applyRedactionMarks() {
   const marks = redact.marks();
   if (!marks.length || !doc) return;
   const scrub = el("input", { type: "checkbox" }) as HTMLInputElement;
+  const everyPage = el("input", { type: "checkbox" }) as HTMLInputElement;
+  const pageCount = doc.pdf.numPages;
   const ok = await showDialog({
     title: "Apply redactions?",
     message: `Text and annotations in ${marks.length === 1 ? "the marked area" : `the ${marks.length} marked areas`} will be removed and blacked out. You can still undo until you close the file. Images under the areas are covered, not erased.`,
-    body: el("label", { className: "chk-lg" }, [scrub, "Also remove document properties (author, title, etc.)"]),
+    body: el("div", { className: "stack" }, [
+      ...(pageCount > 1 ? [el("label", { className: "chk-lg" }, [everyPage, `Apply the same areas to all ${pageCount} pages (repeated headers/footers)`])] : []),
+      el("label", { className: "chk-lg" }, [scrub, "Also remove document properties (author, title, etc.)"]),
+    ]),
     buttons: [{ label: "Cancel", value: false }, { label: "Redact", value: true, primary: true, danger: true }],
   });
   if (!ok) return;
   let glyphs = 0;
   const done = await mutatePages("Redacting", async (b) => {
-    const r = await (await import("./redact")).applyRedactions(b, marks, { ...crypt(), scrubMetadata: scrub.checked });
+    const r = await (await import("./redact")).applyRedactions(b, everyPage.checked ? expandToAllPages(marks, pageCount) : marks, { ...crypt(), scrubMetadata: scrub.checked });
     glyphs = r.glyphs;
     return r.bytes;
   }, viewer.currentPageNumber, true);
-  if (done) { redact.clear(); toast(`Redacted ${marks.length} area${marks.length > 1 ? "s" : ""} (${glyphs} characters removed). Save to keep it.`); }
+  if (done) { redact.clear(); toast(`Redacted ${marks.length} area${marks.length > 1 ? "s" : ""}${everyPage.checked ? ` on all ${pageCount} pages` : ""} (${glyphs} characters removed). Save to keep it.`); }
 }
 
 // ───────────────────────────── Navigation / zoom ─────────────────────────────

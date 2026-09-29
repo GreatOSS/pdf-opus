@@ -228,3 +228,4 @@ body[data-tool="toolRedact"] .textLayer { pointer-events: none; }
 .redact-mark { position: absolute; z-index: 5; background: rgb(0 0 0 / .55); outline: 2px solid #c62828; outline-offset: -1px; }
 .redact-mark.drawing { background: rgb(198 40 40 / .25); pointer-events: none; }
 .redact-remove { position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: #c62828; color: #fff; font-size: 14px; line-height: 1; cursor: pointer; padding: 0; }
+.stack { display: grid; gap: 10px; }

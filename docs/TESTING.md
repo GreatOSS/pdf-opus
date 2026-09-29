@@ -77,9 +77,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Workflow | Result |
 |---|---|
 | Redact a header drawn via a shared Form XObject (3-page generated doc), page 1 only | **Fixed/new:** header text removed from p.1 (29 chars); pp.2–3 unchanged because the form is copied, not edited in place |
+| **New:** “Apply the same areas to all pages” on the 3-page header doc | Header removed on all 3 pages (87 chars), body text intact |
 | Real-file regression (tracemonkey, mime, f1040, w9) after recursion change | Unchanged: targets removed, 0 other items moved |
 
 ### Known gaps / next
-- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Idea: “apply to all pages” for repeated headers. Edit text: non-Latin characters outside WinAnsi become “?”; rotated text/pages not editable yet.
+- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: non-Latin characters outside WinAnsi become “?”; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
 - No offline service worker yet.
