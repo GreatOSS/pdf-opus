@@ -376,19 +376,20 @@ async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uin
     pageUndo.push(before);
     pageRedo.length = 0;
     prevScale = viewer.currentScaleValue;
-    await openBytes(after, d.name, d.handle, { keepPage: keepPage ?? viewer.currentPageNumber, dirty: true });
+    await openBytes(after, d.name, d.handle, { keepPage: keepPage ?? viewer.currentPageNumber, dirty: true, password: d.password });
   } catch (e: any) {
     hideLoading();
     toast(`${label} failed: ${e?.message ?? e}`, "error");
   }
 }
+const crypt = () => ({ password: doc?.password ?? "" });
 const identityPlan = (): PagePlanEntry[] => Array.from({ length: doc!.pdf.numPages }, (_, i) => ({ source: i }));
 
 function rotatePages(indices: number[], delta: number) {
   if (!doc || !indices.length) return;
   const set = new Set(indices);
   thumbs.selectionAfterReload = indices;
-  mutatePages("Rotating", (b) => applyPagePlan(b, identityPlan().map((e) => (set.has(e.source) ? { ...e, rotate: delta } : e))));
+  mutatePages("Rotating", (b) => applyPagePlan(b, identityPlan().map((e) => (set.has(e.source) ? { ...e, rotate: delta } : e)), crypt()));
 }
 function deleteSelected() {
   if (!doc) return;
@@ -398,7 +399,7 @@ function deleteSelected() {
   const set = new Set(sel);
   const first = Math.min(...sel);
   thumbs.selectionAfterReload = [Math.min(first, doc.pdf.numPages - sel.length - 1)];
-  mutatePages(sel.length > 1 ? `Deleting ${sel.length} pages` : "Deleting page", (b) => applyPagePlan(b, identityPlan().filter((e) => !set.has(e.source))), first + 1);
+  mutatePages(sel.length > 1 ? `Deleting ${sel.length} pages` : "Deleting page", (b) => applyPagePlan(b, identityPlan().filter((e) => !set.has(e.source)), crypt()), first + 1);
 }
 function reorderPages(moving: number[], to: number) {
   if (!doc) return;
@@ -411,13 +412,13 @@ function reorderPages(moving: number[], to: number) {
   const next = [...kept.slice(0, at), ...moved, ...kept.slice(at)];
   if (next.every((e, i) => e.source === i)) return;
   thumbs.selectionAfterReload = moved.map((_, i) => at + i);
-  mutatePages("Moving pages", (b) => applyPagePlan(b, next), at + 1);
+  mutatePages("Moving pages", (b) => applyPagePlan(b, next, crypt()), at + 1);
 }
 async function insertPdfAt(at: number) {
   const f = await pickPdf();
   if (!f) return;
   const other = new Uint8Array(await f.arrayBuffer());
-  mutatePages(`Inserting ${f.name}`, (b) => insertDocument(b, other, at), at + 1).then(() => toast(`Inserted “${f.name}”`));
+  mutatePages(`Inserting ${f.name}`, (b) => insertDocument(b, other, at, crypt()), at + 1).then(() => toast(`Inserted “${f.name}”`));
 }
 function pickPdf(): Promise<File | null> {
   const input = $("#insertInput") as HTMLInputElement;
@@ -441,7 +442,7 @@ async function insertMenu() {
       { label: "Pages from a PDF…", value: "pdf", primary: true },
     ],
   });
-  if (choice === "blank") mutatePages("Inserting blank page", (b) => insertBlankPage(b, after), after + 1);
+  if (choice === "blank") mutatePages("Inserting blank page", (b) => insertBlankPage(b, after, crypt()), after + 1);
   else if (choice === "pdf") insertPdfAt(after);
 }
 async function extractDialog() {
@@ -453,7 +454,7 @@ async function extractDialog() {
   if (input === null || !doc) return;
   try {
     const idx = parsePageRanges(input, n);
-    const out = await extractPages(await currentBytes(), idx);
+    const out = await extractPages(await currentBytes(), idx, crypt());
     const name = doc.name.replace(/\.pdf$/i, "") + ` (pages ${input.replace(/\s+/g, "")}).pdf`;
     const a = el("a", { href: URL.createObjectURL(new Blob([out as BlobPart], { type: "application/pdf" })), download: name }) as HTMLAnchorElement;
     a.click();
@@ -485,7 +486,7 @@ function undo() {
   currentBytes().then((cur) => {
     pageRedo.push(cur);
     prevScale = viewer.currentScaleValue;
-    openBytes(prev, doc!.name, doc!.handle, { keepPage: viewer.currentPageNumber, dirty: true });
+    openBytes(prev, doc!.name, doc!.handle, { keepPage: viewer.currentPageNumber, dirty: true, password: doc!.password });
   });
 }
 function redo() {
@@ -495,7 +496,7 @@ function redo() {
   currentBytes().then((cur) => {
     pageUndo.push(cur);
     prevScale = viewer.currentScaleValue;
-    openBytes(next, doc!.name, doc!.handle, { keepPage: viewer.currentPageNumber, dirty: true });
+    openBytes(next, doc!.name, doc!.handle, { keepPage: viewer.currentPageNumber, dirty: true, password: doc!.password });
   });
 }
 function updateUndoButtons() {
@@ -931,7 +932,7 @@ window.addEventListener("drop", (e) => {
   if (doc && target) {
     // Dropping a PDF onto a thumbnail inserts it after that page.
     const at = +target.dataset.index! + 1;
-    pdf.arrayBuffer().then((buf) => mutatePages(`Inserting ${pdf.name}`, (b) => insertDocument(b, new Uint8Array(buf), at), at + 1));
+    pdf.arrayBuffer().then((buf) => mutatePages(`Inserting ${pdf.name}`, (b) => insertDocument(b, new Uint8Array(buf), at, crypt()), at + 1));
   } else openFile(pdf);
 });
 

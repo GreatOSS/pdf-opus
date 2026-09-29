@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PDFDocument, degrees } from "pdf-lib";
+import { PDFDocument, PDFName, PDFRef, degrees } from "@cantoo/pdf-lib";
 import { applyPagePlan, extractPages, insertBlankPage, insertDocument, parsePageRanges } from "../src/organize";
 
 async function makePdf(widths: number[]): Promise<Uint8Array> {
@@ -67,5 +67,39 @@ describe("parsePageRanges", () => {
     expect(() => parsePageRanges("0", 3)).toThrow();
     expect(() => parsePageRanges("4", 3)).toThrow();
     expect(() => parsePageRanges("a", 3)).toThrow();
+  });
+});
+
+describe("encrypted documents", () => {
+  it("decrypts with the password and re-encrypts the result", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([100, 800]); d.addPage([200, 800]);
+    d.encrypt({ userPassword: "pw", ownerPassword: "pw" });
+    const enc = await d.save();
+    await expect(PDFDocument.load(enc)).rejects.toThrow();
+    const out = await applyPagePlan(enc, [{ source: 1 }], { password: "pw" });
+    await expect(PDFDocument.load(out)).rejects.toThrow();
+    const back = await PDFDocument.load(out, { password: "pw" });
+    expect(back.getPages().map((p) => p.getWidth())).toEqual([200]);
+  });
+});
+
+describe("nested page trees", () => {
+  it("keeps inherited MediaBox/Rotate when flattening the tree", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([100, 800]); d.addPage([200, 800]); d.addPage([300, 800]);
+    const ctx = d.context;
+    const rootRef = d.catalog.get(PDFName.of("Pages")) as PDFRef;
+    const root = d.catalog.Pages();
+    const [a, b, c] = d.getPages();
+    // Move pages 2-3 under an intermediate node that supplies MediaBox + Rotate.
+    const mid = ctx.obj({ Type: "Pages", Parent: rootRef, Kids: [b.ref, c.ref], Count: 2, MediaBox: [0, 0, 555, 800], Rotate: 90 });
+    const midRef = ctx.register(mid);
+    for (const p of [b, c]) { p.node.delete(PDFName.of("MediaBox")); p.node.setParent(midRef); }
+    root.set(PDFName.of("Kids"), ctx.obj([a.ref, midRef]));
+    const nested = await d.save({ useObjectStreams: false });
+    const out = await applyPagePlan(nested, [{ source: 2 }, { source: 0 }, { source: 1 }]);
+    const back = await PDFDocument.load(out);
+    expect(back.getPages().map((p) => [p.getWidth(), p.getRotation().angle])).toEqual([[555, 90], [100, 0], [555, 90]]);
   });
 });
