@@ -1060,7 +1060,7 @@ function toggleSidebar(force?: boolean) {
   document.body.classList.toggle("sidebar-open", open);
   if (!narrow.matches) localStorage.setItem("leaflark.sidebar", open ? "1" : "0");
 }
-const narrow = matchMedia("(max-width: 820px)");
+const narrow = matchMedia("(max-width: 960px)");
 toggleSidebar(!narrow.matches && localStorage.getItem("leaflark.sidebar") !== "0");
 
 // Resizable sidebar (drag the edge, or focus it and use ←/→).
