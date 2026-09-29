@@ -1,0 +1,11 @@
+{
+  "name": "Leaflark",
+  "short_name": "Leaflark",
+  "description": "A fast, private PDF viewer and editor.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1b1d1f",
+  "theme_color": "#1f6f5c",
+  "icons": [{ "src": "/leaflark.svg", "sizes": "any", "type": "image/svg+xml" }],
+  "file_handlers": [{ "action": "/", "accept": { "application/pdf": [".pdf"] } }]
+}
