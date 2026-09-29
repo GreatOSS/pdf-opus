@@ -1080,8 +1080,8 @@ function showShortcuts() {
   const list: [string, string][] = [
     [`${mod}O`, "Open"], [`${mod}S`, "Save"], [`${isMac ? "⇧⌘S" : "Ctrl+Shift+S"}`, "Save as"], [`${mod}P`, "Print"],
     [`${mod}F`, "Find"], ["Enter / ⇧Enter", "Next / previous match"], [`${mod}+ / ${mod}−`, "Zoom in / out"], [`${mod}0`, "Fit width"],
-    [`${mod}Z / ${isMac ? "⇧⌘Z" : "Ctrl+Y"}`, "Undo / redo"], ["H, T, D, I, S", "Highlight, text, draw, image, sign"], ["Esc", "Back to select tool"],
-    ["← → / PgUp PgDn", "Previous / next page"], ["Home / End", "First / last page"], ["F4", "Toggle sidebar"], ["Del", "Delete selected pages (sidebar)"],
+    [`${mod}Z / ${isMac ? "⇧⌘Z" : "Ctrl+Y"}`, "Undo / redo"], ["E, H, T, D, I, S, R", "Edit text, highlight, text, draw, image, sign, redact"], ["Esc", "Back to select tool"],
+    ["← → / PgUp PgDn", "Previous / next page"], ["Home / End", "First / last page"], ["F4", "Toggle sidebar"], ["Del", "Delete selected pages (sidebar)"], ["Alt+↑ / Alt+↓", "Move selected pages (sidebar)"],
   ];
   const dl = el("dl", { className: "props keys" });
   for (const [k, v] of list) dl.append(el("dt", {}, [el("kbd", { textContent: k })]), el("dd", { textContent: v }));

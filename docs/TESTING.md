@@ -113,6 +113,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Extract pages
 - tracemonkey, More → Extract pages: “14-12, 99” → inline error “Pages must be between 1 and 14”; “2-4, 9” → download “tracemonkey (pages 2-4,9).pdf”, 4 pages (Poppler). OK. The dialog now states the page count up front.
 
+### 2026-09-29 — Shortcuts dialog
+- Dialog was missing E (Edit text), R (Redact) and Alt+↑/↓ (move pages) → added. Checked Alt+↓ on page 1 thumbnail moves it (p1 now “Hence, recording…”), Ctrl+Z restores. OK.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
