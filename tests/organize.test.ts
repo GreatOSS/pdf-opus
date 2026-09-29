@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument, PDFName, PDFRef, degrees } from "@cantoo/pdf-lib";
-import { applyPagePlan, extractPages, insertBlankPage, insertDocument } from "../src/organize";
+import { applyPagePlan, extractPages, imagesToPdf, insertBlankPage, insertDocument, mergeDocuments } from "../src/organize";
 import { parsePageRanges } from "../src/ranges";
 
 async function makePdf(widths: number[]): Promise<Uint8Array> {
@@ -102,5 +102,18 @@ describe("nested page trees", () => {
     const out = await applyPagePlan(nested, [{ source: 2 }, { source: 0 }, { source: 1 }]);
     const back = await PDFDocument.load(out);
     expect(back.getPages().map((p) => [p.getWidth(), p.getRotation().angle])).toEqual([[555, 90], [100, 0], [555, 90]]);
+  });
+});
+
+describe("merge / images", () => {
+  it("merges documents in order", async () => {
+    const out = await mergeDocuments([await makePdf([100]), await makePdf([200, 300])]);
+    expect(await widthsOf(out)).toEqual([100, 200, 300]);
+  });
+  it("turns a PNG into a page", async () => {
+    // 1×1 transparent PNG
+    const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+    const out = await imagesToPdf([{ bytes: png, type: "image/png" }]);
+    expect((await PDFDocument.load(out)).getPageCount()).toBe(1);
   });
 });

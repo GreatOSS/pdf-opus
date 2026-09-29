@@ -31,7 +31,11 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Password PDF: delete page | **Fixed:** output was unreadable (pdf-lib can’t decrypt). Switched to `@cantoo/pdf-lib`; edits decrypt with the entered password and re-encrypt with it |
 | Page tree flattening with inherited MediaBox/Rotate | Covered by unit test |
 
+| Production build (`vite preview`): open, rotate (lazy-loaded pdf-lib), service worker registers | OK. **Fixed:** relative pdf.js asset URL broke ICC wasm in the worker |
+| Open 3 files at once (W-9 PDF + PNG + 1040 PDF) | Combined into 9 pages, image page sized 600×450pt, 1040 widgets still render |
+
 ### Known gaps / next
+- Merged/inserted form pages keep their widgets (fine in Leaflark/pdf.js) but the fields are not added to the target's AcroForm, so other viewers may treat them as non-interactive.
 - No automated end-to-end tests yet (only unit tests for page operations).
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
 - No offline service worker yet.

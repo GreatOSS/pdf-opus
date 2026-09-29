@@ -111,3 +111,34 @@ export async function extractPages(bytes: Uint8Array, indices: number[], { passw
   if (title) out.setTitle(title);
   return save(out, password);
 }
+
+/** Build a PDF with one page per image (JPEG or PNG), each page sized to fit its image at 96 dpi, max A4-ish. */
+export async function imagesToPdf(images: { bytes: Uint8Array; type: string }[]): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  for (const { bytes, type } of images) {
+    const img = type === "image/png" ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+    // 96 dpi → points, then shrink to fit within 612×842 (keeps phone photos a sensible size).
+    let w = img.width * 0.75, h = img.height * 0.75;
+    const k = Math.min(1, 612 / Math.min(w, h), 842 / Math.max(w, h));
+    w *= k; h *= k;
+    doc.addPage([w, h]).drawImage(img, { x: 0, y: 0, width: w, height: h });
+  }
+  return doc.save();
+}
+
+/** Concatenate several PDFs into one. */
+export async function mergeDocuments(docs: Uint8Array[]): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+  for (const bytes of docs) {
+    let src: PDFDocument;
+    try {
+      src = await load(bytes);
+    } catch (e) {
+      if (/encrypted/i.test(String(e))) throw new Error("One of the files is password-protected. Open it on its own first.");
+      throw e;
+    }
+    const pages = await out.copyPages(src, src.getPageIndices());
+    pages.forEach((p) => out.addPage(p));
+  }
+  return out.save();
+}

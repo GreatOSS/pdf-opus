@@ -105,7 +105,7 @@ $("#app").innerHTML = `
         <h1>${APP_NAME}</h1>
         <p>View, annotate, fill, sign and reorganize PDFs.<br />Your files never leave this device.</p>
         <button id="welcomeOpen" class="primary-btn big" type="button">${icons.open}<span>Open a PDF</span></button>
-        <p class="hint">or drop a file anywhere · ${mod}O</p>
+        <p class="hint">or drop PDFs or images anywhere · ${mod}O<br />Drop several files to combine them</p>
       </div>
     </section>
     <div id="loading" class="loading" hidden><div class="spinner"></div><span id="loadingText">Opening…</span></div>
@@ -116,7 +116,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miOpen">Open…</button>
   <button role="menuitem" id="miSaveAs">Save as…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
-  <button role="menuitem" id="miMerge">Append another PDF…</button>
+  <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <hr />
   <button role="menuitem" id="miSpread">Two-page view</button>
   <button role="menuitem" id="miTheme">Dark mode</button>
@@ -125,8 +125,8 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miShortcuts">Keyboard shortcuts</button>
   <button role="menuitem" id="miClose">Close document</button>
 </div>
-<input id="fileInput" type="file" accept="application/pdf,.pdf" hidden />
-<input id="insertInput" type="file" accept="application/pdf,.pdf" hidden />
+<input id="fileInput" type="file" accept="application/pdf,.pdf,image/png,image/jpeg" multiple hidden />
+<input id="insertInput" type="file" accept="application/pdf,.pdf,image/png,image/jpeg" multiple hidden />
 <div id="toasts" class="toasts" aria-live="polite"></div>
 `;
 
@@ -240,19 +240,50 @@ async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | n
 }
 let prevScale = "auto";
 
-async function openFile(file: File, handle: FileHandle | null = null) {
-  if (!(await confirmDiscard())) return;
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  pageUndo.length = pageRedo.length = 0;
-  await openBytes(bytes, file.name, handle);
+const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+const isImage = (f: File) => /^image\/(png|jpeg)$/.test(f.type) || /\.(png|jpe?g)$/i.test(f.name);
+
+/** Turn a selection of PDFs and images into one PDF (in the given order). */
+async function filesToPdf(files: File[]): Promise<{ bytes: Uint8Array; name: string } | null> {
+  const usable = files.filter((f) => isPdf(f) || isImage(f));
+  const skipped = files.length - usable.length;
+  if (!usable.length) { toast("Leaflark opens PDF, PNG and JPEG files.", "error"); return null; }
+  if (skipped) toast(`Skipped ${skipped} file${skipped > 1 ? "s" : ""} that aren’t PDFs or images.`);
+  if (usable.length === 1 && isPdf(usable[0])) return { bytes: new Uint8Array(await usable[0].arrayBuffer()), name: usable[0].name };
+  const org = await organize();
+  const parts: Uint8Array[] = [];
+  for (const f of usable) {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    parts.push(isPdf(f) ? bytes : await org.imagesToPdf([{ bytes, type: /png$/i.test(f.type || f.name) ? "image/png" : "image/jpeg" }]));
+  }
+  const name = usable.length === 1 ? usable[0].name.replace(/\.[^.]+$/, "") + ".pdf" : "Combined.pdf";
+  return { bytes: parts.length === 1 ? parts[0] : await org.mergeDocuments(parts), name };
 }
+
+async function openFiles(files: File[], handle: FileHandle | null = null) {
+  if (!files.length || !(await confirmDiscard())) return;
+  const single = files.length === 1 && isPdf(files[0]);
+  if (!single) showLoading(files.length > 1 ? `Combining ${files.length} files…` : "Converting image…");
+  let res;
+  try { res = await filesToPdf(files); } catch (e: any) { hideLoading(); toast(e?.message ?? String(e), "error"); return; }
+  if (!res) { hideLoading(); return; }
+  pageUndo.length = pageRedo.length = 0;
+  if (doc) setDirty(false); // discard confirmed above
+  await openBytes(res.bytes, res.name, single ? handle : null, { dirty: !single });
+  if (files.length > 1) toast(`Combined ${files.length} files — save to keep the result.`);
+}
+const openFile = (file: File, handle: FileHandle | null = null) => openFiles([file], handle);
 
 async function pickAndOpen() {
   const w = window as any;
   if (w.showOpenFilePicker) {
     try {
-      const [handle] = await w.showOpenFilePicker({ types: [{ description: "PDF documents", accept: { "application/pdf": [".pdf"] } }] });
-      await openFile(await handle.getFile(), handle);
+      const handles = await w.showOpenFilePicker({
+        multiple: true,
+        types: [{ description: "PDF documents and images", accept: { "application/pdf": [".pdf"], "image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"] } }],
+      });
+      const files = await Promise.all(handles.map((h: any) => h.getFile()));
+      await openFiles(files, handles.length === 1 ? handles[0] : null);
     } catch (e: any) {
       if (e?.name !== "AbortError") toast(String(e?.message ?? e), "error");
     }
@@ -420,18 +451,25 @@ function reorderPages(moving: number[], to: number) {
   thumbs.selectionAfterReload = moved.map((_, i) => at + i);
   mutatePages("Moving pages", async (b) => (await organize()).applyPagePlan(b, next, crypt()), at + 1);
 }
-async function insertPdfAt(at: number) {
-  const f = await pickPdf();
-  if (!f) return;
-  const other = new Uint8Array(await f.arrayBuffer());
-  mutatePages(`Inserting ${f.name}`, async (b) => (await organize()).insertDocument(b, other, at, crypt()), at + 1).then((ok) => ok && toast(`Inserted “${f.name}”`));
+async function insertFilesAt(files: File[], at: number) {
+  if (!files.length) return;
+  const label = files.length === 1 ? files[0].name : `${files.length} files`;
+  let other: Uint8Array | null = null;
+  const ok = await mutatePages(`Inserting ${label}`, async (b) => {
+    const res = await filesToPdf(files);
+    if (!res) throw new Error("nothing to insert");
+    other = res.bytes;
+    return (await organize()).insertDocument(b, other, at, crypt());
+  }, at + 1);
+  if (ok && other) toast(`Inserted ${label}`);
 }
-function pickPdf(): Promise<File | null> {
+async function insertPdfAt(at: number) { insertFilesAt(await pickFiles(), at); }
+function pickFiles(): Promise<File[]> {
   const input = $("#insertInput") as HTMLInputElement;
   input.value = "";
   return new Promise((res) => {
-    input.onchange = () => res(input.files?.[0] ?? null);
-    input.oncancel = () => res(null);
+    input.onchange = () => res([...(input.files ?? [])]);
+    input.oncancel = () => res([]);
     input.click();
   });
 }
@@ -445,7 +483,7 @@ async function insertMenu() {
     buttons: [
       { label: "Cancel", value: "" },
       { label: "Blank page", value: "blank" },
-      { label: "Pages from a PDF…", value: "pdf", primary: true },
+      { label: "From files…", value: "pdf", primary: true },
     ],
   });
   if (choice === "blank") mutatePages("Inserting blank page", async (b) => (await organize()).insertBlankPage(b, after, crypt()), after + 1);
@@ -915,15 +953,20 @@ on("#pgDelete", deleteSelected);
 on("#pgInsert", insertMenu);
 for (const id of Object.keys(toolButtons)) on("#" + id, () => (id === "toolSign" ? startSignature() : setMode(toolButtons[id], id === "toolImage", id)));
 ($("#fileInput") as HTMLInputElement).onchange = (e) => {
-  const f = (e.target as HTMLInputElement).files?.[0];
-  if (f) openFile(f);
+  const files = [...((e.target as HTMLInputElement).files ?? [])];
+  if (files.length) openFiles(files);
   (e.target as HTMLInputElement).value = "";
 };
 
 // Drag & drop anywhere (but not when reordering thumbnails).
 let dragDepth = 0;
 const hasFiles = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes("Files");
-window.addEventListener("dragenter", (e) => { if (hasFiles(e)) { dragDepth++; $("#dropOverlay").hidden = false; } });
+window.addEventListener("dragenter", (e) => {
+  if (!hasFiles(e)) return;
+  dragDepth++;
+  $("#dropOverlay").firstElementChild!.textContent = doc ? "Drop to open · drop on the page list to insert" : "Drop PDFs or images to open";
+  $("#dropOverlay").hidden = false;
+});
 window.addEventListener("dragleave", (e) => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; $("#dropOverlay").hidden = true; } });
 window.addEventListener("dragover", (e) => { if (hasFiles(e)) e.preventDefault(); });
 window.addEventListener("drop", (e) => {
@@ -931,15 +974,13 @@ window.addEventListener("drop", (e) => {
   e.preventDefault();
   dragDepth = 0;
   $("#dropOverlay").hidden = true;
-  const files = [...(e.dataTransfer?.files ?? [])];
-  const pdf = files.find((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
-  if (!pdf) { toast("That doesn’t look like a PDF file.", "error"); return; }
-  const target = (e.target as HTMLElement).closest?.(".thumb") as HTMLElement | null;
+  const files = [...(e.dataTransfer?.files ?? [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const target = (e.target as HTMLElement).closest?.(".thumb, .ll-sidebar") as HTMLElement | null;
   if (doc && target) {
-    // Dropping a PDF onto a thumbnail inserts it after that page.
-    const at = +target.dataset.index! + 1;
-    pdf.arrayBuffer().then((buf) => mutatePages(`Inserting ${pdf.name}`, async (b) => (await organize()).insertDocument(b, new Uint8Array(buf), at, crypt()), at + 1));
-  } else openFile(pdf);
+    // Dropping files onto the page list inserts them (after the page under the pointer, or at the end).
+    const at = target.classList.contains("thumb") ? +target.dataset.index! + 1 : doc.pdf.numPages;
+    insertFilesAt(files, at);
+  } else openFiles(files);
 });
 
 // Keyboard shortcuts.
