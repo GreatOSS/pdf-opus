@@ -5,7 +5,7 @@ paywalls at save time, watermarks, daily limits, no way to edit existing text, W
 Leaflark's baseline answers the first three by design (free, local, unlimited, no watermark, cross-platform).
 
 ## Next
-1. **Edit existing text** (most requested gap): click a text run to replace it (cover + re-typeset with matching font where embeddable).
+1. **Edit existing text** — v1 done 2026-09-29 (cover + retype with matched standard font). Next: remove original glyphs from the content stream, reuse embedded fonts when they contain the needed glyphs, multi-line paragraphs, Unicode via embedded fallback font.
 2. **Redaction** that really removes content (not just a black box).
 3. ~~Page numbers / watermark~~ (done 2026-09-29); headers/footers with custom text and Bates numbering next.
 4. **Compress** (image downsampling) and **OCR** for scanned PDFs (tesseract.js, lazy-loaded).

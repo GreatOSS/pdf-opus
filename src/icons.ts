@@ -13,6 +13,7 @@ export const icons = {
   text: svg('<path d="M4 7V5h16v2M9 19h6M12 5v14"/>'),
   draw: svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
   image: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>'),
+  editText: svg('<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 7.5l3 3"/><path d="M4 4h9M4 8h5"/>'),
   signature: svg('<path d="M3 17c3-6 5-9 6-9 2 0-2 9 0 9 1.5 0 3-4 4-4s0 3 1 3 2-1 3-2"/><path d="M3 21h18"/>'),
   undo: svg('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
   redo: svg('<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),

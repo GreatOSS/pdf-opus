@@ -90,3 +90,20 @@ test("mobile layout keeps tools reachable @mobile", async ({ page }) => {
   expect(tb.y + tb.height).toBeGreaterThan(vp.height - 2);
   await expect(page.locator("#sidebar")).toHaveCSS("width", "0px");
 });
+
+test("edits existing text in place", async ({ page }) => {
+  await open(page, 1);
+  await page.keyboard.press("e");
+  const span = page.locator(".page .textLayer span", { hasText: "Hello Leaflark" }).first();
+  const b = (await span.boundingBox())!;
+  await page.mouse.click(b.x + 10, b.y + b.height / 2);
+  await expect(page.locator(".edit-box")).toHaveText("Hello Leaflark page 1");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("Goodbye typo");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(async () => {
+    const p = await (window as any).leaflark.doc.pdf.getPage(1);
+    return (await p.getTextContent()).items.map((i: any) => i.str).join(" ");
+  })).toContain("Goodbye typo");
+  await expect(page).toHaveTitle(/^• /);
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument, degrees } from "@cantoo/pdf-lib";
-import { formatNumber, stampPages, visualToUser } from "../src/stamp";
+import { applyTextEdits, formatNumber, stampPages, visualToUser } from "../src/stamp";
 
 describe("visualToUser", () => {
   const box: [number, number, number, number] = [0, 0, 600, 800];
@@ -30,5 +30,17 @@ describe("stampPages", () => {
     const back = await PDFDocument.load(out);
     expect(back.getPageCount()).toBe(2);
     expect(out.length).toBeGreaterThan(src.length);
+  });
+});
+
+describe("applyTextEdits", () => {
+  it("draws replacement text, substituting unsupported characters", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([600, 800]);
+    const out = await applyTextEdits(await d.save(), [{
+      pageIndex: 0, rect: [50, 690, 200, 20], x: 50, y: 695, size: 12, text: "Fixed typo ✓ ok",
+      family: "serif", bold: true, italic: false, color: [0, 0, 0], background: [1, 1, 1],
+    }]);
+    expect((await PDFDocument.load(out)).getPageCount()).toBe(1);
   });
 });

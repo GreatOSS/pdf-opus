@@ -11,6 +11,7 @@ import { parsePageRanges } from "./ranges";
 const organize = () => import("./organize");
 import { Thumbnails } from "./thumbnails";
 import { chooseSignature, dataUrlToFile } from "./signature";
+import { setupEditText } from "./edittext";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -52,6 +53,7 @@ $("#app").innerHTML = `
   <div class="tb-group needs-doc">
     <div class="segmented" role="radiogroup" aria-label="Tools">
       ${btn("toolNone", icons.select, "Select text", "Esc")}
+      ${btn("toolEdit", icons.editText, "Edit text", "E")}
       ${btn("toolHighlight", icons.highlight, "Highlight", "H")}
       ${btn("toolText", icons.text, "Add text", "T")}
       ${btn("toolDraw", icons.draw, "Draw", "D")}
@@ -176,7 +178,7 @@ const thumbs = new Thumbnails($("#thumbs"), {
 });
 
 // ───────────────────────────── Loading ─────────────────────────────
-async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | null = null, opts: { keepPage?: number; dirty?: boolean; password?: string } = {}) {
+async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | null = null, opts: { keepPage?: number; dirty?: boolean; password?: string; scroll?: [number, number] } = {}) {
   const seq = ++loadSeq;
   showLoading(opts.keepPage ? "Updating…" : `Opening ${name}…`);
   let password = opts.password;
@@ -228,6 +230,7 @@ async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | n
     eventBus.off("pagesinit", once);
     viewer.currentScaleValue = keep ? prevScale : "auto";
     if (keep) viewer.currentPageNumber = Math.min(keep, pdf.numPages);
+    if (opts.scroll) [container.scrollLeft, container.scrollTop] = opts.scroll;
     hideLoading();
     if (keep && currentMode !== Mode.NONE) setMode(currentMode, true, activeToolId);
   });
@@ -403,7 +406,7 @@ async function print() {
 }
 
 // ───────────────────────────── Page operations ─────────────────────────────
-async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uint8Array>, keepPage?: number): Promise<boolean> {
+async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uint8Array>, keepPage?: number, keepScroll = false): Promise<boolean> {
   if (!doc) return false;
   const d = doc;
   showLoading(`${label}…`);
@@ -413,7 +416,7 @@ async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uin
     pageUndo.push(before);
     pageRedo.length = 0;
     prevScale = viewer.currentScaleValue;
-    await openBytes(after, d.name, d.handle, { keepPage: keepPage ?? viewer.currentPageNumber, dirty: true, password: d.password });
+    await openBytes(after, d.name, d.handle, { keepPage: keepPage ?? viewer.currentPageNumber, dirty: true, password: d.password, scroll: keepScroll ? [container.scrollLeft, container.scrollTop] : undefined });
     return true;
   } catch (e: any) {
     hideLoading();
@@ -595,7 +598,7 @@ eventBus.on("editingstateschanged", ({ details }: any) => {
 
 // ───────────────────────────── Annotation tools ─────────────────────────────
 const toolButtons: Record<string, number> = {
-  toolNone: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.STAMP,
+  toolNone: Mode.NONE, toolEdit: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.STAMP,
 };
 const palette = ["#000000", "#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#FFFFFF"];
 const hlPalette = ["#FFF176", "#A5F2B8", "#9CDCFE", "#FFB3D9", "#FFC680"];
@@ -654,6 +657,7 @@ function renderToolOptions(toolId: string) {
     toolText: { colors: palette, size: ["Size", 6, 72, 14], hint: "Click anywhere on a page to add text." },
     toolDraw: { colors: palette, size: ["Thickness", 1, 20, 3], opacity: true, hint: "Drag on a page to draw." },
     toolSign: { colors: [], hint: "Click on a page to place your signature. Drag to move it, drag a corner to resize." },
+    toolEdit: { colors: [], hint: "Click any line of text to change it. Enter to apply, Esc to cancel. The old text is covered, not removed from the file." },
     toolImage: { colors: [], hint: "Choose an image, then drag it where you want. Click on a page to add another." },
   };
   const spec = specs[toolId];
@@ -742,6 +746,18 @@ container.addEventListener("pointerdown", (e) => {
   ed.setDims?.();
   ed.fixAndSetPosition?.();
 }, true);
+
+// ───────────────────────────── Edit existing text ─────────────────────────────
+const editText = setupEditText({
+  container,
+  viewer,
+  pdf: () => doc?.pdf ?? null,
+  active: () => activeToolId === "toolEdit",
+  notify: toast,
+  commit: (edit) => {
+    mutatePages("Editing text", async (b) => (await import("./stamp")).applyTextEdits(b, [edit], crypt()), edit.pageIndex + 1, true);
+  },
+});
 
 // ───────────────────────────── Navigation / zoom ─────────────────────────────
 const pageInput = $("#pageInput") as HTMLInputElement;
@@ -1118,7 +1134,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   const inThumbs = $("#thumbs").contains(t);
-  const toolKeys: Record<string, string> = { h: "toolHighlight", t: "toolText", d: "toolDraw", i: "toolImage", s: "toolSign" };
+  const toolKeys: Record<string, string> = { e: "toolEdit", h: "toolHighlight", t: "toolText", d: "toolDraw", i: "toolImage", s: "toolSign" };
   if (toolKeys[k] && !e.shiftKey) { e.preventDefault(); $("#" + toolKeys[k]).click(); return; }
   if (inThumbs) return;
   if (viewer.isInPresentationMode || currentMode !== Mode.NONE) return;
