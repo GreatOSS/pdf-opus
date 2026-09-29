@@ -116,6 +116,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Shortcuts dialog
 - Dialog was missing E (Edit text), R (Redact) and Alt+↑/↓ (move pages) → added. Checked Alt+↓ on page 1 thumbnail moves it (p1 now “Hence, recording…”), Ctrl+Z restores. OK.
 
+### 2026-09-29 — Two-page view + properties (1440×900)
+- mime.pdf (19 p): Two-page view pairs 17|18, 19 alone; End → 19, ← → 17. Document properties: size, dates, creator/producer, PDF 1.5, page size in in/mm, tagged/form flags all shown. OK.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
