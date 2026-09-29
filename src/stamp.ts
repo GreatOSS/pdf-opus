@@ -1,6 +1,7 @@
 // Page numbers and text watermarks, drawn into page content so every viewer shows them.
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "@cantoo/pdf-lib";
 import type { CryptOptions } from "./organize";
+import { removeTextFromPage } from "./redact";
 
 export type NumberPosition = "bottom-center" | "bottom-right" | "bottom-left" | "top-center" | "top-right";
 export type NumberFormat = "n" | "page-n" | "page-n-of-total" | "n-slash-total";
@@ -119,6 +120,8 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
     if (!fonts.has(key)) fonts.set(key, await doc.embedFont(FONT_FOR[key]));
     const font = fonts.get(key)!;
     const [rx, ry, rw, rh] = e.rect;
+    // Remove the old glyphs for real (so search/copy no longer find them), then cover any remnants.
+    removeTextFromPage(doc, page, [e.rect]);
     page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, color: rgb(...e.background) });
     // Standard fonts only cover WinAnsi; replace anything else rather than failing.
     const safe = [...e.text].map((ch) => { try { font.encodeText(ch); return ch; } catch { return "?"; } }).join("");

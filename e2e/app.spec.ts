@@ -105,5 +105,29 @@ test("edits existing text in place", async ({ page }) => {
     const p = await (window as any).leaflark.doc.pdf.getPage(1);
     return (await p.getTextContent()).items.map((i: any) => i.str).join(" ");
   })).toContain("Goodbye typo");
+  const text = await page.evaluate(async () => {
+    const p = await (window as any).leaflark.doc.pdf.getPage(1);
+    return (await p.getTextContent()).items.map((i: any) => i.str).join(" ");
+  });
+  expect(text).not.toContain("Hello Leaflark");
   await expect(page).toHaveTitle(/^• /);
+});
+
+test("redacts text for real", async ({ page }) => {
+  await open(page, 1);
+  await page.locator("#toolRedact").click();
+  const span = page.locator(".page .textLayer span", { hasText: "Hello Leaflark" }).first();
+  const b = (await span.boundingBox())!;
+  await page.mouse.move(b.x - 4, b.y - 4);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width + 4, b.y + b.height + 4, { steps: 5 });
+  await page.mouse.up();
+  await page.getByRole("button", { name: "Apply 1 redaction" }).click();
+  await page.locator(".ll-dialog button[type=submit]").click();
+  await expect(page.locator(".toast").last()).toContainText("Redacted 1 area");
+  const text = await page.evaluate(async () => {
+    const p = await (window as any).leaflark.doc.pdf.getPage(1);
+    return (await p.getTextContent()).items.map((i: any) => i.str).join(" ");
+  });
+  expect(text).not.toContain("Leaflark");
 });

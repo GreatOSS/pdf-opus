@@ -12,6 +12,7 @@ const organize = () => import("./organize");
 import { Thumbnails } from "./thumbnails";
 import { chooseSignature, dataUrlToFile } from "./signature";
 import { setupEditText } from "./edittext";
+import { setupRedact } from "./redactui";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -59,6 +60,7 @@ $("#app").innerHTML = `
       ${btn("toolDraw", icons.draw, "Draw", "D")}
       ${btn("toolImage", icons.image, "Add image", "I")}
       ${btn("toolSign", icons.signature, "Add signature", "S")}
+      ${btn("toolRedact", icons.redact, "Redact", "R")}
     </div>
     <span class="sep"></span>
     ${btn("btnUndo", icons.undo, "Undo", `${mod}Z`)}
@@ -219,6 +221,7 @@ async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | n
   if (seq !== loadSeq) { pdf.loadingTask.destroy(); return; }
   const old = doc?.pdf;
   doc = { pdf, bytes, name, handle, dirty: !!opts.dirty, password };
+  redact.clear(); // marks refer to the previous page layout
   (pdf.annotationStorage as any).onSetModified = () => setDirty(true);
   viewer.setDocument(pdf);
   linkService.setDocument(pdf, null);
@@ -598,7 +601,7 @@ eventBus.on("editingstateschanged", ({ details }: any) => {
 
 // ───────────────────────────── Annotation tools ─────────────────────────────
 const toolButtons: Record<string, number> = {
-  toolNone: Mode.NONE, toolEdit: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.STAMP,
+  toolNone: Mode.NONE, toolEdit: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.STAMP, toolRedact: Mode.NONE,
 };
 const palette = ["#000000", "#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#FFFFFF"];
 const hlPalette = ["#FFF176", "#A5F2B8", "#9CDCFE", "#FFB3D9", "#FFC680"];
@@ -657,7 +660,8 @@ function renderToolOptions(toolId: string) {
     toolText: { colors: palette, size: ["Size", 6, 72, 14], hint: "Click anywhere on a page to add text." },
     toolDraw: { colors: palette, size: ["Thickness", 1, 20, 3], opacity: true, hint: "Drag on a page to draw." },
     toolSign: { colors: [], hint: "Click on a page to place your signature. Drag to move it, drag a corner to resize." },
-    toolEdit: { colors: [], hint: "Click any line of text to change it. Enter to apply, Esc to cancel. The old text is covered, not removed from the file." },
+    toolEdit: { colors: [], hint: "Click any line of text to change it. Enter to apply, Esc to cancel." },
+    toolRedact: { colors: [], hint: "Drag over anything you want to remove permanently — text underneath is deleted, not just covered." },
     toolImage: { colors: [], hint: "Choose an image, then drag it where you want. Click on a page to add another." },
   };
   const spec = specs[toolId];
@@ -693,6 +697,16 @@ function renderToolOptions(toolId: string) {
     const b = el("button", { className: "text-btn", type: "button", textContent: "Change signature…" }) as HTMLButtonElement;
     b.onclick = () => startSignature();
     box.append(b);
+  }
+  if (toolId === "toolRedact") {
+    const n = redact.marks().length;
+    if (n) {
+      const clear = el("button", { className: "text-btn", type: "button", textContent: "Clear marks" }) as HTMLButtonElement;
+      clear.onclick = () => redact.clear();
+      const apply = el("button", { className: "primary-btn danger", type: "button", textContent: `Apply ${n} redaction${n > 1 ? "s" : ""}` }) as HTMLButtonElement;
+      apply.onclick = applyRedactionMarks;
+      box.append(clear, apply);
+    }
   }
   if (toolId === "toolImage") {
     const b = el("button", { className: "text-btn", type: "button", textContent: "Choose image…" }) as HTMLButtonElement;
@@ -758,6 +772,30 @@ const editText = setupEditText({
     mutatePages("Editing text", async (b) => (await import("./stamp")).applyTextEdits(b, [edit], crypt()), edit.pageIndex + 1, true);
   },
 });
+
+// ───────────────────────────── Redaction ─────────────────────────────
+const redact = setupRedact({
+  container, viewer, eventBus,
+  active: () => activeToolId === "toolRedact",
+  onChange: () => { if (activeToolId === "toolRedact") renderToolOptions("toolRedact"); },
+});
+async function applyRedactionMarks() {
+  const marks = redact.marks();
+  if (!marks.length || !doc) return;
+  const ok = await confirmDialog({
+    title: "Apply redactions?",
+    message: `Text and annotations in ${marks.length === 1 ? "the marked area" : `the ${marks.length} marked areas`} will be removed and blacked out. You can still undo until you close the file. Images under the areas are covered, not erased.`,
+    okLabel: "Redact", danger: true,
+  });
+  if (!ok) return;
+  let glyphs = 0;
+  const done = await mutatePages("Redacting", async (b) => {
+    const r = await (await import("./redact")).applyRedactions(b, marks, crypt());
+    glyphs = r.glyphs;
+    return r.bytes;
+  }, viewer.currentPageNumber, true);
+  if (done) { redact.clear(); toast(`Redacted ${marks.length} area${marks.length > 1 ? "s" : ""} (${glyphs} characters removed). Save to keep it.`); }
+}
 
 // ───────────────────────────── Navigation / zoom ─────────────────────────────
 const pageInput = $("#pageInput") as HTMLInputElement;
@@ -1134,7 +1172,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   const inThumbs = $("#thumbs").contains(t);
-  const toolKeys: Record<string, string> = { e: "toolEdit", h: "toolHighlight", t: "toolText", d: "toolDraw", i: "toolImage", s: "toolSign" };
+  const toolKeys: Record<string, string> = { r: "toolRedact", e: "toolEdit", h: "toolHighlight", t: "toolText", d: "toolDraw", i: "toolImage", s: "toolSign" };
   if (toolKeys[k] && !e.shiftKey) { e.preventDefault(); $("#" + toolKeys[k]).click(); return; }
   if (inThumbs) return;
   if (viewer.isInPresentationMode || currentMode !== Mode.NONE) return;
