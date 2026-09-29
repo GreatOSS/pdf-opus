@@ -126,7 +126,7 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 - w9 p1, Image tool → file chooser opens straight away → PNG (680×880) placed, Save → Poppler shows it, embedded at full resolution. OK. pdf.js placed new images at up to ~75% of the page, burying the form → Leaflark now picks the file itself and places the image at its own size (96 dpi), max 40% of page width, centred in the visible part of the current page. Re-checked: PNG on p2 at 40% width, centred in view, undoable; SVG logo at natural size; both in the saved PDF (pdfimages).
 
 ### 2026-09-29 — Outline
-- mime.pdf, Outline tab: tree with collapsible sections, “3. Contributors” → page 18. OK. On p1 the highlight was the last section starting on the page (1.2) → now follows the section at the top of the view while scrolling (1 → 1.1 → 1.2), clicking an entry highlights it. Remaining polish: expand arrows are small ▼/► glyphs.
+- mime.pdf, Outline tab: tree with collapsible sections, “3. Contributors” → page 18. OK. On p1 the highlight was the last section starting on the page (1.2) → now follows the section at the top of the view while scrolling (1 → 1.1 → 1.2), clicking an entry highlights it. Expand arrows were mismatched ▼/► glyphs → CSS chevrons, checked collapsed + expanded.
 
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.

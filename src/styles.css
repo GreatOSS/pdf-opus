@@ -103,8 +103,11 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .outline a.current { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .twisty, .twisty-space { width: 20px; height: 24px; flex: none; }
 .twisty { border: 0; background: transparent; cursor: pointer; color: var(--muted); }
-.twisty::before { content: "▸"; display: inline-block; transition: transform .1s; }
-li.open > .outline-row .twisty::before { transform: rotate(90deg); }
+/* CSS chevron: renders the same in every font (the ▸ glyph varied in size). */
+.twisty::before { content: ""; display: inline-block; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0;
+  transform: rotate(-45deg); transition: transform .1s; margin-top: 2px; }
+.twisty:hover { color: var(--text); }
+li.open > .outline-row .twisty::before { transform: rotate(45deg); margin-top: -2px; }
 .empty { color: var(--muted); padding: 12px; text-align: center; }
 
 .stage { position: relative; flex: 1; min-width: 0; background: var(--stage); isolation: isolate; }
