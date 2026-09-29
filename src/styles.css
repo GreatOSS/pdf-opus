@@ -174,7 +174,15 @@ kbd { font: 12px ui-monospace, monospace; padding: 2px 6px; border: 1px solid va
     background: var(--surface); border-top: 1px solid var(--border); padding: 0 8px env(safe-area-inset-bottom); }
   body.has-doc .workspace { height: calc(100% - var(--toolbar-h) - 52px); }
   body.sidebar-open.has-doc .ll-sidebar { position: absolute; z-index: 12; height: 100%; box-shadow: var(--shadow); }
-  .tool-options { top: auto; bottom: 62px; gap: 10px; }
+  .tool-options { top: auto; bottom: 62px; gap: 8px 10px; padding: 6px 8px; justify-content: center; }
+  /* Compact on phones. */
+  .tool-options .range { gap: 6px; font-size: 12px; }
+  .tool-options .range input { width: 72px; }
+  /* Colours + Done on the first row, sliders on the second. */
+  .tool-options .swatches { order: 0; }
+  .tool-options .tool-done { order: 1; }
+  .tool-options .range { order: 2; }
+  .tool-options .swatches { gap: 4px; }
   .find-bar { left: 8px; right: 8px; }
   .find-bar input[type="search"] { flex: 1; width: auto; min-width: 0; }
   .find-bar .chk { display: none; }

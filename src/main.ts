@@ -685,12 +685,12 @@ function renderToolOptions(toolId: string) {
     const val = el("span", { className: "range-val", textContent: String(prefs.size ?? d) });
     const r = el("input", { type: "range", min: String(min), max: String(max), value: String(prefs.size ?? d), ariaLabel: label }) as HTMLInputElement;
     r.oninput = () => { prefs.size = +r.value; val.textContent = r.value; savePrefs(); applyParams(toolId); };
-    box.append(el("label", { className: "range" }, [label, r, val]));
+    box.append(el("label", { className: "range" }, [el("span", { className: "range-label", textContent: label }), r, val]));
   }
   if (spec.opacity) {
     const r = el("input", { type: "range", min: "0.1", max: "1", step: "0.05", value: String(prefs.opacity ?? 1), ariaLabel: "Opacity" }) as HTMLInputElement;
     r.oninput = () => { prefs.opacity = +r.value; savePrefs(); applyParams(toolId); };
-    box.append(el("label", { className: "range" }, ["Opacity", r]));
+    box.append(el("label", { className: "range" }, [el("span", { className: "range-label", textContent: "Opacity" }), r]));
   }
   box.append(el("span", { className: "tool-hint", textContent: spec.hint }));
   if (toolId === "toolSign") {
@@ -713,7 +713,7 @@ function renderToolOptions(toolId: string) {
     b.onclick = () => eventBus.dispatch("switchannotationeditorparams", { source: null, type: Param.CREATE, value: null });
     box.append(b);
   }
-  const done = el("button", { className: "text-btn", type: "button", textContent: "Done" }) as HTMLButtonElement;
+  const done = el("button", { className: "text-btn tool-done", type: "button", textContent: "Done" }) as HTMLButtonElement;
   done.onclick = () => setMode(Mode.NONE, true);
   box.append(done);
   requestAnimationFrame(() => applyParams(toolId));
