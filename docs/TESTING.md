@@ -98,6 +98,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Form fill round trip
 - f1040: typed “Jane” / “Doé” into two text fields, ticked a checkbox, Ctrl+S (download fallback) → reopened in Leaflark: values and checkbox kept. Rendered with Poppler (pdftoppm/pdftotext): both values incl. “é” and the tick visible. OK.
 
+### 2026-09-29 — Page numbers & watermark
+- tracemonkey via More → Page numbers & watermark (defaults + “CONFIDENTIAL”) → Apply → Save. Poppler: numbers 1/7/14 on pages 1/7/14, diagonal watermark present (faint at default opacity) on p1 and p7. OK.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
