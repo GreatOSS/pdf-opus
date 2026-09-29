@@ -85,7 +85,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Edit text with unsupported characters
 - tracemonkey p1: typed “Łódź” in the title → error toast listing Ł ź, box stays open; retyped “Lodz title” → saved, text layer shows it. OK.
 
+### 2026-09-29 — Offline
+- Production build + preview, fresh profile: visit once, go offline, reload → app loads, opens w9.pdf, Redact tool (lazy chunk) and Find work. Before the fix: shell loaded but opening a PDF failed (worker/chunks never cached; `Vary: Origin` made cached assets miss). Fixed by build-time precache list + `ignoreVary`.
+- Seen: with Redact active, its hint banner overlaps the Find bar's search box (w9, 1280px wide).
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
-- No offline service worker yet.
