@@ -191,6 +191,12 @@ kbd { font: 12px ui-monospace, monospace; padding: 2px 6px; border: 1px solid va
   .find-bar .chk { display: none; }
   .find-count { min-width: 0; }
 }
+/* Tablets: the compact layout has room for page count, zoom and Open again. */
+@media (min-width: 700px) and (max-width: 960px) {
+  .page-count { display: inline; }
+  #btnOpen { display: inline-grid; }
+  #zoomSelect { display: block; }
+}
 /* pdf.js editor toolbar: keep its mask icons centred inside our button styles. */
 .editToolbar button { line-height: 0; font-size: 0; }
 .editToolbar .basic::before { display: block !important; }
