@@ -150,8 +150,8 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 - With `showSaveFilePicker` removed, Ctrl+Shift+S just re-downloaded under the same name. Now asks for a name (prefilled “w9.pdf”); “bad/name” → inline error; “W-9 signed” → download “W-9 signed.pdf”, title updated, later Ctrl+S keeps the new name. Print: hidden iframe created, no errors (dialog itself not checkable headless).
 
 ### 2026-09-29 — Firefox
-- Installed Playwright Firefox 155; all 8 desktop e2e tests pass (open, bad file, find, page edits + undo, text box save, page numbers, Edit text, redaction). Firefox project added to CI.
+- Installed Playwright Firefox 155; all 8 desktop e2e tests pass (open, bad file, find, page edits + undo, text box save, page numbers, Edit text, redaction). Firefox project added to CI. WebKit (Safari engine; needed ~135 system libs via agent-packages): all 8 pass too, added to CI.
 
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
-- Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox dialog not checkable headless; Safari untested).
+- Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
