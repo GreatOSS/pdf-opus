@@ -146,6 +146,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Redaction undo/redo
 - tracemonkey p1: R, marked the title, Apply → confirm (mentions undo until close, image caveat) → title text gone from text layer; Ctrl+Z → back; Ctrl+Y → gone again. OK.
 
+### 2026-09-29 — Save as without file picker (Firefox/Safari path)
+- With `showSaveFilePicker` removed, Ctrl+Shift+S just re-downloaded under the same name. Now asks for a name (prefilled “w9.pdf”); “bad/name” → inline error; “W-9 signed” → download “W-9 signed.pdf”, title updated, later Ctrl+S keeps the new name. Print: hidden iframe created, no errors (dialog itself not checkable headless).
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).

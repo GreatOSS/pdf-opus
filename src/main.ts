@@ -358,6 +358,14 @@ async function save(saveAs = false) {
   const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
   const w = window as any;
   let handle = saveAs ? null : doc.handle;
+  if (saveAs && !w.showSaveFilePicker) {
+    // No file picker (Firefox, Safari): at least let the user choose the download's name.
+    const name = await promptDialog({ title: "Save as", message: "File name:", value: doc.name, okLabel: "Download",
+      validate: (v) => (v.trim() && !/[\\/:*?"<>|]/.test(v) ? null : "Enter a file name without \\ / : * ? \" < > |") });
+    if (name == null) return;
+    doc.name = /\.pdf$/i.test(name.trim()) ? name.trim() : `${name.trim()}.pdf`;
+    updateTitle();
+  }
   if (!handle && w.showSaveFilePicker) {
     try {
       handle = await w.showSaveFilePicker({ suggestedName: doc.name, types: [{ description: "PDF document", accept: { "application/pdf": [".pdf"] } }] });
