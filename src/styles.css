@@ -59,8 +59,8 @@ body.has-doc .no-doc-only { display: none; }
 
 /* Workspace */
 .workspace { position: relative; height: calc(100% - var(--toolbar-h)); display: flex; }
-.ll-sidebar { position: relative; width: 0; overflow: hidden; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: width .15s ease; flex: none; }
-body.sidebar-open.has-doc .ll-sidebar { width: var(--sidebar-w); }
+.ll-sidebar { position: relative; width: 0; overflow: hidden; background: var(--surface); border-right: 0 solid var(--border); display: flex; flex-direction: column; transition: width .15s ease; flex: none; }
+body.sidebar-open.has-doc .ll-sidebar { width: var(--sidebar-w); border-right-width: 1px; }
 body.resizing-sidebar .ll-sidebar { transition: none; }
 body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .sidebar-resizer { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 3; }

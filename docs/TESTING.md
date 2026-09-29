@@ -1,5 +1,7 @@
 # Hands-on test log
 
+Automated coverage: `npm test` (unit: page ops, forms merge, encryption, stamping) and `npm run e2e` (Playwright: open, bad file, search, rotate/delete/undo, add text + save download, page numbers, mobile layout). Both run in CI.
+
 Concise record of what was actually exercised in the running app, and known remaining problems.
 Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroForm, 2 pages), IRS W-9, shared-mime-info spec.
 
@@ -42,10 +44,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Outline (mime spec, 3 levels): click entry, expand section | Navigation OK. **Fixed:** 184px sidebar wrapped titles badly and scrolled horizontally → sidebar is now resizable (drag edge / ←→ on handle, persisted), outline wraps cleanly, thumbnails scale with width |
 | Reading position in outline | **New:** current section highlighted and revealed while scrolling; auto-expanded sections collapse again |
 | More → Document properties | OK |
+| Closed sidebar | **Fixed:** 1px border line remained visible (caught by e2e) |
 | Combine W-9 + 1040 + 1040 (421 fields), type into 2nd 1040 copy | **Fixed:** fields now registered in AcroForm (were only widgets); clashing names suffixed “(2)/(3)” so copies don’t share values; stale XFA dropped |
 | More → Page numbers & watermark on a doc with a 90°-rotated page | **New.** Numbers upright at visual bottom-centre on rotated page, diagonal watermark; undoable |
 
 ### Known gaps / next
-- No automated end-to-end tests yet (only unit tests for page operations).
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
 - No offline service worker yet.

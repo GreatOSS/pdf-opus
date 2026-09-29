@@ -7,7 +7,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview --port 4173 --host 127.0.0.1",
     "test": "vitest run",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "e2e": "playwright test"
   },
   "repository": {
     "type": "git",
@@ -30,6 +31,8 @@
     "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vite-plugin-static-copy": "^4.1.1",

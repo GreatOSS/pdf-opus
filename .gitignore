@@ -2,3 +2,5 @@ node_modules/
 dist/
 public/samples/
 *.log
+test-results/
+playwright-report/
