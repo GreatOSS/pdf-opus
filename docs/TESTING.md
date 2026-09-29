@@ -122,6 +122,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Insert blank page
 - w9, select page 2, sidebar “+” → dialog “Insert after page 2” → Blank page: 7 pages, view on new p3, same size as neighbours. OK.
 
+### 2026-09-29 — Add image
+- w9 p1, Image tool → file chooser opens straight away → PNG (680×880) placed, Save → Poppler shows it, embedded at full resolution. OK. Polish idea: pdf.js places new images at up to ~75% of the page, so a portrait image covers most of a form; a smaller default (e.g. ≤40% width) would suit logos/photos better. Resizable via corner handles.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
