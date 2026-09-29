@@ -123,7 +123,7 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 - w9, select page 2, sidebar “+” → dialog “Insert after page 2” → Blank page: 7 pages, view on new p3, same size as neighbours. OK.
 
 ### 2026-09-29 — Add image
-- w9 p1, Image tool → file chooser opens straight away → PNG (680×880) placed, Save → Poppler shows it, embedded at full resolution. OK. Polish idea: pdf.js places new images at up to ~75% of the page, so a portrait image covers most of a form; a smaller default (e.g. ≤40% width) would suit logos/photos better. Resizable via corner handles.
+- w9 p1, Image tool → file chooser opens straight away → PNG (680×880) placed, Save → Poppler shows it, embedded at full resolution. OK. pdf.js placed new images at up to ~75% of the page, burying the form → Leaflark now picks the file itself and places the image at its own size (96 dpi), max 40% of page width, centred in the visible part of the current page. Re-checked: PNG on p2 at 40% width, centred in view, undoable; SVG logo at natural size; both in the saved PDF (pdfimages).
 
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.

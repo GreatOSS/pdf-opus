@@ -618,7 +618,7 @@ function setMode(mode: number, force = false, toolId?: string) {
   syncToolUI(toolId);
   if (toolId === "toolImage") {
     // Ask for the image right away instead of making users click the page first.
-    setTimeout(() => eventBus.dispatch("switchannotationeditorparams", { source: null, type: Param.CREATE, value: null }), 50);
+    setTimeout(chooseImage, 50);
   }
 }
 eventBus.on("annotationeditormodechanged", ({ mode }: { mode: number }) => {
@@ -710,7 +710,7 @@ function renderToolOptions(toolId: string) {
   }
   if (toolId === "toolImage") {
     const b = el("button", { className: "text-btn", type: "button", textContent: "Choose image…" }) as HTMLButtonElement;
-    b.onclick = () => eventBus.dispatch("switchannotationeditorparams", { source: null, type: Param.CREATE, value: null });
+    b.onclick = chooseImage;
     box.append(b);
   }
   const done = el("button", { className: "text-btn tool-done", type: "button", textContent: "Done" }) as HTMLButtonElement;
@@ -718,6 +718,40 @@ function renderToolOptions(toolId: string) {
   box.append(done);
   requestAnimationFrame(() => applyParams(toolId));
 }
+
+// ───────────────────────────── Images ─────────────────────────────
+// pdf.js would size a new image at up to 75% of the page, burying forms under photos.
+// Place it at its own size (96 dpi), at most 40% of the page width, centred in view.
+const imageInput = el("input", { type: "file", accept: "image/*", hidden: true }) as HTMLInputElement;
+document.body.append(imageInput);
+function chooseImage() { imageInput.value = ""; imageInput.click(); }
+imageInput.addEventListener("change", async () => {
+  const file = imageInput.files?.[0];
+  if (!file || !doc) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.src = url;
+  try { await img.decode(); } catch { toast("That image can’t be opened.", "error"); return; } finally { URL.revokeObjectURL(url); }
+  const view = viewer.getPageView(viewer.currentPageNumber - 1) as any;
+  const layer = view?.annotationEditorLayer?.annotationEditorLayer;
+  if (!layer || !img.naturalWidth) return;
+  const r = layer.div.getBoundingClientRect(), c = container.getBoundingClientRect();
+  const cx = (Math.max(r.left, c.left) + Math.min(r.right, c.right)) / 2 - r.left;
+  const cy = (Math.max(r.top, c.top) + Math.min(r.bottom, c.bottom)) / 2 - r.top;
+  const ed = layer.createAndAddNewEditor({ offsetX: cx, offsetY: cy }, false, { bitmapFile: file });
+  if (!ed) return;
+  const [pw, ph] = ed.pageDimensions as [number, number];
+  const ratio = img.naturalHeight / img.naturalWidth;
+  let w = Math.min(img.naturalWidth * 0.75, pw * 0.4);
+  if (w * ratio > ph * 0.5) w = (ph * 0.5) / ratio;
+  const wf = w / pw, hf = (w * ratio) / ph;
+  ed.width = wf;
+  ed.height = hf;
+  ed.x = Math.max(0, Math.min(1 - wf, cx / r.width - wf / 2));
+  ed.y = Math.max(0, Math.min(1 - hf, cy / r.height - hf / 2));
+  ed.setDims?.();
+  ed.fixAndSetPosition?.();
+});
 
 // ───────────────────────────── Signatures ─────────────────────────────
 let pendingSignature: { file: File; ratio: number } | null = null;
