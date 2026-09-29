@@ -40,6 +40,14 @@ export function groupRuns(items: any[]): Run[] {
   return runs;
 }
 
+// Characters the standard PDF fonts (WinAnsi encoding) can draw.
+const WIN_ANSI_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+export const unsupportedChars = (text: string) =>
+  [...new Set([...text].filter((ch) => {
+    const c = ch.codePointAt(0)!;
+    return !((c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || WIN_ANSI_EXTRA.includes(ch));
+  }))];
+
 const familyOf = (css: string | undefined, name: string): TextEdit["family"] => {
   const n = name.toLowerCase();
   if (/courier|mono|consol|menlo/.test(n) || css === "monospace") return "mono";
@@ -175,8 +183,15 @@ export function setupEditText(ctx: Ctx) {
     sel?.selectAllChildren(box);
     const finish = (save: boolean) => {
       if (editing !== box) return;
-      editing = null;
       const text = (box.textContent ?? "").replace(/\s+/g, " ").trimEnd();
+      const bad = save ? unsupportedChars(text) : [];
+      if (bad.length) {
+        // Keep the box open so the user can fix the text instead of getting "?" in the PDF.
+        ctx.notify(`Can’t write ${bad.slice(0, 5).join(" ")} with the standard PDF fonts yet. Please use other characters.`, "error");
+        if (document.activeElement !== box) box.focus();
+        return;
+      }
+      editing = null;
       box.remove();
       if (!save || text === run.str.trimEnd()) return;
       cache.delete(idx);

@@ -82,7 +82,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 
 | Dark mode + Edit text on mime spec heading | OK — editor uses the page’s sampled colours (white/black), options pill themed |
 
+### 2026-09-29 — Edit text with unsupported characters
+- tracemonkey p1: typed “Łódź” in the title → error toast listing Ł ź, box stays open; retyped “Lodz title” → saved, text layer shows it. OK.
+
 ### Known gaps / next
-- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: non-Latin characters outside WinAnsi become “?”; rotated text/pages not editable yet.
+- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
 - No offline service worker yet.
