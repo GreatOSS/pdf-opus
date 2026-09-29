@@ -140,6 +140,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Phone landscape (780×360)
 - Sign dialog: “Place signature” was below the screen edge (dialog had to be scrolled while drawing). Pad now shrinks with screen height, same shape → 336×120 pad, buttons in view (bottom 331px); drew a stroke and placed it. Portrait phone and desktop sizes unchanged.
 
+### 2026-09-29 — Typed signature, long name
+- “Maximilian Alexander Featherstonehaugh-Worthington”: font previews cut the name off with “…” → previews now shrink to fit (27–30px), full name visible; short names stay 32px.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).

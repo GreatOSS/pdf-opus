@@ -157,6 +157,11 @@ export async function chooseSignature(): Promise<string | null> {
       b.onclick = () => { fontIdx = i; renderFonts(); };
       return b;
     }));
+    // Shrink long names to fit rather than cutting them off.
+    requestAnimationFrame(() => fontsRow.querySelectorAll<HTMLElement>(".sig-font").forEach((b) => {
+      const room = b.clientWidth - 28;
+      if (b.scrollWidth - 28 > room && room > 0) b.style.fontSize = `${Math.max(14, Math.floor(32 * room / (b.scrollWidth - 28)))}px`;
+    }));
   };
   input.addEventListener("input", renderFonts);
   renderFonts();
