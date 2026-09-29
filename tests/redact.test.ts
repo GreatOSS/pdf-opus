@@ -83,3 +83,26 @@ describe("metadata scrub", () => {
     expect(Buffer.from(bytes).toString("latin1")).not.toContain("Jane Secret");
   });
 });
+
+describe("Form XObjects", () => {
+  it("removes text inside a shared form on one page without touching other pages", async () => {
+    const src = await PDFDocument.create();
+    const sf = await src.embedFont(StandardFonts.Helvetica);
+    src.addPage([300, 100]).drawText("Header SECRET", { x: 10, y: 40, size: 12, font: sf });
+    const d = await PDFDocument.create();
+    const [form] = await d.embedPdf(await src.save());
+    for (let i = 0; i < 2; i++) d.addPage([600, 800]).drawPage(form, { x: 100, y: 600 });
+    const bytes = await d.save();
+    const doc = await PDFDocument.load(bytes);
+    // Form content at (10,40) is drawn at page (110, 640).
+    const n = removeTextFromPage(doc, doc.getPage(0), [[100, 630, 300, 30]]);
+    expect(n).toBe(13);
+    const out = await doc.save();
+    const text = async (p: number) => {
+      const pd = await pdfjs.getDocument({ data: out.slice(), useWorkerFetch: false }).promise;
+      return ((await (await pd.getPage(p)).getTextContent()).items as any[]).map((i) => i.str).join("");
+    };
+    expect(await text(1)).toBe("");
+    expect(await text(2)).toContain("Header SECRET");
+  });
+});

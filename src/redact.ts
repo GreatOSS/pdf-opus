@@ -192,12 +192,15 @@ const hexOf = (bytes: number[]) => "<" + bytes.map((x) => x.toString(16).padStar
  * Remove glyphs whose centre lies inside any of `rects` from one content stream.
  * Returns the new stream bytes and how many glyphs were removed.
  */
-export function removeTextInRects(content: Uint8Array, rects: Rect[], fontFor: (name: string) => FontInfo): { bytes: Uint8Array; removed: number } {
+export function removeTextInRects(
+  content: Uint8Array, rects: Rect[], fontFor: (name: string) => FontInfo,
+  initialCtm: M = [1, 0, 0, 1, 0, 0], onForm?: (name: string, ctm: M) => void,
+): { bytes: Uint8Array; removed: number } {
   const toks = tokenize(content);
   const edits: { s: number; e: number; text: string }[] = [];
   let removed = 0;
   interface GS { ctm: M; tc: number; tw: number; th: number; tl: number; rise: number; size: number; font: FontInfo; }
-  let gs: GS = { ctm: [1, 0, 0, 1, 0, 0], tc: 0, tw: 0, th: 1, tl: 0, rise: 0, size: 0, font: { bytes: 1, width: () => 500 } };
+  let gs: GS = { ctm: initialCtm, tc: 0, tw: 0, th: 1, tl: 0, rise: 0, size: 0, font: { bytes: 1, width: () => 500 } };
   const stack: GS[] = [];
   let tm: M = [1, 0, 0, 1, 0, 0], tlm: M = [1, 0, 0, 1, 0, 0];
   let operands: Tok[] = [];
@@ -252,6 +255,7 @@ export function removeTextInRects(content: Uint8Array, rects: Rect[], fontFor: (
       case "q": stack.push({ ...gs }); break;
       case "Q": gs = stack.pop() ?? gs; break;
       case "cm": if (nums.length === 6) gs.ctm = mul(nums as M, gs.ctm); break;
+      case "Do": { const name = operands.find((o) => o.t === "name"); if (name && onForm) onForm(name.v as string, gs.ctm); break; }
       case "BT": tm = [1, 0, 0, 1, 0, 0]; tlm = [1, 0, 0, 1, 0, 0]; break;
       case "Tf": {
         const name = operands.find((o) => o.t === "name");
@@ -304,33 +308,82 @@ export function removeTextInRects(content: Uint8Array, rects: Rect[], fontFor: (
 }
 
 /** Apply text removal to a page (all its content streams are merged into one). */
-export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[]): number {
+const decode = (s: unknown): Uint8Array | null =>
+  s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : s instanceof PDFStream ? ((s as any).getUnencodedContents?.() ?? null) : null;
+
+function fontLookup(doc: PDFDocument, resources: PDFDict | undefined) {
   const ctx = doc.context;
-  const node = page.node;
-  const contents = node.get(PDFName.of("Contents"));
-  const refs: any[] = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
-  const parts: Uint8Array[] = [];
-  for (const r of refs) {
-    const s = ctx.lookup(r);
-    if (s instanceof PDFRawStream) parts.push(decodePDFRawStream(s).decode());
-    else if (s instanceof PDFStream) parts.push((s as any).getUnencodedContents?.() ?? new Uint8Array());
-  }
-  if (!parts.length) return 0;
-  const joined = new Uint8Array(parts.reduce((a, p) => a + p.length + 1, 0));
-  let o = 0;
-  for (const p of parts) { joined.set(p, o); o += p.length; joined[o++] = 10; }
-  const fonts = node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict);
+  const fonts = resources?.lookupMaybe(PDFName.of("Font"), PDFDict);
   const cache = new Map<string, FontInfo>();
-  const fontFor = (name: string) => {
+  return (name: string) => {
     if (!cache.has(name)) {
       const f = fonts?.get(PDFName.of(name));
       cache.set(name, fontInfo(doc, (f instanceof PDFRef ? ctx.lookup(f) : f) as PDFDict | undefined));
     }
     return cache.get(name)!;
   };
-  const { bytes, removed } = removeTextInRects(joined, rects, fontFor);
+}
+
+/**
+ * Remove text inside Form XObjects drawn by a content stream. Changed forms are
+ * copied (never edited in place) and the owner's resources are cloned, so other
+ * pages that share the same form keep their text.
+ */
+function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, resources: PDFDict | undefined, calls: { name: string; ctm: M }[], rects: Rect[], depth: number): number {
+  if (!resources || !calls.length || depth > 8) return 0;
+  const ctx = doc.context;
+  let res = resources;
+  let cloned = false;
+  let total = 0;
+  for (const call of calls) {
+    const xobjs = res.lookupMaybe(PDFName.of("XObject"), PDFDict);
+    const stream = xobjs ? ctx.lookup(xobjs.get(PDFName.of(call.name))) : undefined;
+    if (!(stream instanceof PDFRawStream || stream instanceof PDFStream)) continue;
+    const sdict = (stream as PDFRawStream).dict;
+    if ((sdict.get(PDFName.of("Subtype")) as PDFName | undefined)?.decodeText?.() !== "Form") continue;
+    const bytes = decode(stream);
+    if (!bytes) continue;
+    const mat = sdict.lookupMaybe(PDFName.of("Matrix"), PDFArray);
+    const m = (mat?.asArray().map((n) => (ctx.lookup(n) as PDFNumber).asNumber()) ?? [1, 0, 0, 1, 0, 0]) as M;
+    const formCtm = mul(m, call.ctm);
+    const formRes = sdict.lookupMaybe(PDFName.of("Resources"), PDFDict) ?? res;
+    const nested: { name: string; ctm: M }[] = [];
+    const { bytes: out, removed } = removeTextInRects(bytes, rects, fontLookup(doc, formRes), formCtm, (name, ctm) => nested.push({ name, ctm }));
+    const dict = sdict.clone(ctx);
+    const nestedRemoved = processForms(doc, (r) => dict.set(PDFName.of("Resources"), r), formRes, nested, rects, depth + 1);
+    if (!removed && !nestedRemoved) continue;
+    const copy = ctx.flateStream(out);
+    for (const [k, v] of dict.entries()) {
+      if (!["Filter", "DecodeParms", "Length"].includes(k.decodeText())) copy.dict.set(k, v);
+    }
+    if (!cloned) {
+      res = res.clone(ctx);
+      res.set(PDFName.of("XObject"), res.lookup(PDFName.of("XObject"), PDFDict).clone(ctx));
+      setResources(res);
+      cloned = true;
+    }
+    res.lookup(PDFName.of("XObject"), PDFDict).set(PDFName.of(call.name), ctx.register(copy));
+    total += removed + nestedRemoved;
+  }
+  return total;
+}
+
+/** Apply text removal to a page, including text drawn via Form XObjects. */
+export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[]): number {
+  const ctx = doc.context;
+  const node = page.node;
+  const contents = node.get(PDFName.of("Contents"));
+  const refs: any[] = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
+  const parts = refs.map((r) => decode(ctx.lookup(r))).filter((p): p is Uint8Array => !!p);
+  if (!parts.length) return 0;
+  const joined = new Uint8Array(parts.reduce((a, p) => a + p.length + 1, 0));
+  let o = 0;
+  for (const p of parts) { joined.set(p, o); o += p.length; joined[o++] = 10; }
+  const resources = node.Resources();
+  const forms: { name: string; ctm: M }[] = [];
+  const { bytes, removed } = removeTextInRects(joined, rects, fontLookup(doc, resources), [1, 0, 0, 1, 0, 0], (name, ctm) => forms.push({ name, ctm }));
   if (removed) node.set(PDFName.of("Contents"), ctx.register(ctx.flateStream(bytes)));
-  return removed;
+  return removed + processForms(doc, (r) => node.set(PDFName.of("Resources"), r), resources, forms, rects, 0);
 }
 
 export interface RedactionMark { pageIndex: number; rect: Rect }

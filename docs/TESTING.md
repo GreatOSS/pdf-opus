@@ -71,7 +71,15 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Redact with a finger drag (CDP touch events, e2e) | **Fixed:** the browser treated the drag as a scroll and cancelled the pointer, leaving a stuck half-drawn mark → `touch-action: none` while redacting + pointercancel cleanup |
 | Redact with “Also remove document properties” on tracemonkey | 60 chars removed; Info dictionary and XMP gone |
 
+
+## 2026-09-29 (session 6)
+
+| Workflow | Result |
+|---|---|
+| Redact a header drawn via a shared Form XObject (3-page generated doc), page 1 only | **Fixed/new:** header text removed from p.1 (29 chars); pp.2–3 unchanged because the form is copied, not edited in place |
+| Real-file regression (tracemonkey, mime, f1040, w9) after recursion change | Unchanged: targets removed, 0 other items moved |
+
 ### Known gaps / next
-- Redaction does not yet touch text inside Form XObjects or pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: non-Latin characters outside WinAnsi become “?”; rotated text/pages not editable yet.
+- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Idea: “apply to all pages” for repeated headers. Edit text: non-Latin characters outside WinAnsi become “?”; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
 - No offline service worker yet.
