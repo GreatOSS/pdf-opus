@@ -177,7 +177,7 @@ kbd { font: 12px ui-monospace, monospace; padding: 2px 6px; border: 1px solid va
   .tool-options { top: auto; bottom: 62px; gap: 10px; }
   .find-bar { left: 8px; right: 8px; }
   .find-bar input[type="search"] { flex: 1; width: auto; min-width: 0; }
-  .chk { display: none; }
+  .find-bar .chk { display: none; }
   .find-count { min-width: 0; }
 }
 /* pdf.js editor toolbar: keep its mask icons centred inside our button styles. */
