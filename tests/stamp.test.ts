@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PDFDocument, degrees } from "@cantoo/pdf-lib";
+import { readFileSync } from "node:fs";
+import { PDFDict, PDFDocument, PDFName, degrees } from "@cantoo/pdf-lib";
 import { applyTextEdits, formatNumber, stampPages, visualToUser } from "../src/stamp";
 
 describe("visualToUser", () => {
@@ -42,5 +43,19 @@ describe("applyTextEdits", () => {
       family: "serif", bold: true, italic: false, color: [0, 0, 0], background: [1, 1, 1],
     }]);
     expect((await PDFDocument.load(out)).getPageCount()).toBe(1);
+  });
+  it("embeds a subset of the Unicode font for characters outside the standard fonts", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([600, 800]);
+    const font = new Uint8Array(readFileSync(new URL("../public/fonts/DejaVuSans.ttf", import.meta.url)));
+    const edit = { pageIndex: 0, rect: [50, 690, 200, 20] as [number, number, number, number], x: 50, y: 695, size: 12, text: "Łódź ✓",
+      family: "sans" as const, bold: false, italic: false, color: [0, 0, 0] as [number, number, number], background: [1, 1, 1] as [number, number, number] };
+    const out = await applyTextEdits(await d.save(), [edit], { unicodeFont: async () => font });
+    const embedded = async (bytes: Uint8Array) => (await PDFDocument.load(bytes)).context.enumerateIndirectObjects()
+      .filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of("FontFile2"))).length;
+    expect(await embedded(out)).toBe(1); // embedded TrueType
+    expect(out.length).toBeLessThan(font.length / 4); // a subset, not the whole 760 KB font
+    // ASCII-only edits keep using the standard fonts (no embedding).
+    expect(await embedded(await applyTextEdits(await d.save(), [{ ...edit, text: "Lodz" }], { unicodeFont: async () => font }))).toBe(0);
   });
 });

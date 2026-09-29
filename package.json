@@ -27,6 +27,7 @@
   },
   "homepage": "https://github.com/GreatOSS/pdf-opus#readme",
   "dependencies": {
+    "@cantoo/fontkit": "^2.0.12",
     "@cantoo/pdf-lib": "^2.11.1",
     "pdfjs-dist": "^6.3.289"
   },

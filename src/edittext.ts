@@ -2,6 +2,9 @@
 // The replacement is written into the page (cover + new text) by applyTextEdits().
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { TextEdit } from "./stamp";
+import { missingGlyphs } from "./unifont";
+import { unsupportedChars } from "./winansi";
+export { unsupportedChars };
 
 interface Run {
   str: string;
@@ -40,13 +43,6 @@ export function groupRuns(items: any[]): Run[] {
   return runs;
 }
 
-// Characters the standard PDF fonts (WinAnsi encoding) can draw.
-const WIN_ANSI_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
-export const unsupportedChars = (text: string) =>
-  [...new Set([...text].filter((ch) => {
-    const c = ch.codePointAt(0)!;
-    return !((c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || WIN_ANSI_EXTRA.includes(ch));
-  }))];
 
 const familyOf = (css: string | undefined, name: string): TextEdit["family"] => {
   const n = name.toLowerCase();
@@ -184,11 +180,20 @@ export function setupEditText(ctx: Ctx) {
     const finish = (save: boolean) => {
       if (editing !== box) return;
       const text = (box.textContent ?? "").replace(/\s+/g, " ").trimEnd();
-      const bad = save ? unsupportedChars(text) : [];
-      if (bad.length) {
-        // Keep the box open so the user can fix the text instead of getting "?" in the PDF.
-        ctx.notify(`Can’t write ${bad.slice(0, 5).join(" ")} with the standard PDF fonts yet. Please use other characters.`, "error");
-        if (document.activeElement !== box) box.focus();
+      const outside = save ? unsupportedChars(text) : [];
+      const b = box as HTMLElement & { _glyphs?: "pending" | "ok" };
+      if (outside.length && b._glyphs !== "ok") {
+        if (b._glyphs === "pending") return;
+        // Not in the standard fonts: check the Unicode fallback font covers them before applying.
+        b._glyphs = "pending";
+        missingGlyphs(outside).then((bad) => {
+          if (bad.length) {
+            b._glyphs = undefined;
+            // Keep the box open so the user can fix the text instead of getting blanks in the PDF.
+            ctx.notify(`Can’t write ${bad.slice(0, 5).join(" ")} yet. Please use other characters.`, "error");
+            if (document.activeElement !== box) box.focus();
+          } else { b._glyphs = "ok"; finish(true); }
+        }, () => { b._glyphs = undefined; ctx.notify("Couldn’t load the font for these characters. Check your connection and try again.", "error"); });
         return;
       }
       editing = null;

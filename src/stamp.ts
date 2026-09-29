@@ -2,6 +2,7 @@
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "@cantoo/pdf-lib";
 import type { CryptOptions } from "./organize";
 import { removeTextFromPage } from "./redact";
+import { unsupportedChars } from "./winansi";
 
 export type NumberPosition = "bottom-center" | "bottom-right" | "bottom-left" | "top-center" | "top-right";
 export type NumberFormat = "n" | "page-n" | "page-n-of-total" | "n-slash-total";
@@ -111,20 +112,31 @@ const FONT_FOR: Record<string, StandardFonts> = {
 };
 
 /** Replace text visually: cover the old run with its background colour and draw the new text on top. */
-export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { password = "" }: CryptOptions = {}): Promise<Uint8Array> {
+export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { password = "", unicodeFont }: CryptOptions & { unicodeFont?: () => Promise<Uint8Array> } = {}): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
   const fonts = new Map<string, PDFFont>();
+  let uni: PDFFont | undefined;
+
   for (const e of edits) {
     const page = doc.getPage(e.pageIndex);
     const key = `${e.family}-${e.bold ? "b" : ""}-${e.italic ? "i" : ""}`;
     if (!fonts.has(key)) fonts.set(key, await doc.embedFont(FONT_FOR[key]));
-    const font = fonts.get(key)!;
+    let font = fonts.get(key)!;
+    // Characters outside the standard fonts: embed a subset of the Unicode fallback font instead.
+    if (unicodeFont && unsupportedChars(e.text).length) {
+      if (!uni) {
+        const fontkit: any = await import("@cantoo/fontkit");
+        doc.registerFontkit(fontkit.default ?? fontkit);
+        uni = await doc.embedFont(await unicodeFont(), { subset: true });
+      }
+      font = uni;
+    }
     const [rx, ry, rw, rh] = e.rect;
     // Remove the old glyphs for real (so search/copy no longer find them), then cover any remnants.
     removeTextFromPage(doc, page, [e.rect]);
     page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, color: rgb(...e.background) });
-    // Standard fonts only cover WinAnsi; replace anything else rather than failing.
-    const safe = [...e.text].map((ch) => { try { font.encodeText(ch); return ch; } catch { return "?"; } }).join("");
+    // Without the fallback font, standard fonts only cover WinAnsi; replace anything else rather than failing.
+    const safe = font === uni ? e.text : [...e.text].map((ch) => (unsupportedChars(ch).length ? "?" : ch)).join("");
     const x = e.align === "center" ? rx + rw / 2 - font.widthOfTextAtSize(safe, e.size) / 2 : e.x;
     if (safe.trim()) page.drawText(safe, { x, y: e.y, size: e.size, font, color: rgb(...e.color) });
   }

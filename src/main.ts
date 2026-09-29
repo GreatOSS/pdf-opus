@@ -12,6 +12,7 @@ const organize = () => import("./organize");
 import { Thumbnails } from "./thumbnails";
 import { chooseSignature, dataUrlToFile } from "./signature";
 import { setupEditText, unsupportedChars } from "./edittext";
+import { unicodeFontBytes } from "./unifont";
 import { setupRedact } from "./redactui";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
@@ -811,7 +812,7 @@ const editText = setupEditText({
   active: () => activeToolId === "toolEdit",
   notify: toast,
   commit: (edit) => {
-    mutatePages("Editing text", async (b) => (await import("./stamp")).applyTextEdits(b, [edit], crypt()), edit.pageIndex + 1, true);
+    mutatePages("Editing text", async (b) => (await import("./stamp")).applyTextEdits(b, [edit], { ...crypt(), unicodeFont: unicodeFontBytes }), edit.pageIndex + 1, true);
   },
 });
 

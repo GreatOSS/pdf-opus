@@ -152,6 +152,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Firefox
 - Installed Playwright Firefox 155; all 8 desktop e2e tests pass (open, bad file, find, page edits + undo, text box save, page numbers, Edit text, redaction). Firefox project added to CI. WebKit (Safari engine; needed ~135 system libs via agent-packages): all 8 pass too, added to CI. iPhone 14 profile (WebKit) runs the @mobile tests (layout, touch redaction via synthetic touch pointer events — CDP touch is Chromium-only): pass.
 
+### 2026-09-30 — Edit text with Unicode
+- Edit text now embeds a subset of DejaVu Sans (loaded on demand, +~11 KB per file) for characters outside WinAnsi. tracemonkey p1: title → “Łódź ✓ Ωμέγα” → Poppler renders it and pdftotext extracts it; pdffonts shows DejaVuSans CID TrueType embedded. “日本” still refused with a message (not in DejaVu), box stays open. Found on the way: this pdf-lib fork's `encodeText` never threw, so the old “?” fallback never fired — now uses an explicit WinAnsi check. Limits: the fallback is DejaVu Sans Regular only (a bold serif heading becomes regular sans); the edited title came out left-aligned rather than centred; text boxes (pdf.js FreeText) still only warn.
+
 ### Known gaps / next
-- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
+- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
