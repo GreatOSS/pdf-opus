@@ -132,16 +132,28 @@ test("redacts text for real", async ({ page }) => {
   expect(text).not.toContain("Leaflark");
 });
 
-test("redaction marks can be drawn with touch @mobile", async ({ page }) => {
+test("redaction marks can be drawn with touch @mobile", async ({ page, browserName }) => {
   await open(page, 1);
   await page.locator("#toolRedact").click();
   const b = (await page.locator(".page").first().boundingBox())!;
-  const cdp = await page.context().newCDPSession(page);
   const scrollBefore = await page.locator("#viewerContainer").evaluate((e) => e.scrollTop);
-  const pt = (x: number, y: number) => [{ x: b.x + x, y: b.y + y }];
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: pt(20, 20) });
-  for (let i = 1; i <= 6; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: pt(20 + i * 20, 20 + i * 12) });
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  if (browserName === "chromium") {
+    // Real touch input (only Chromium exposes it), so native scrolling would show up too.
+    const cdp = await page.context().newCDPSession(page);
+    const pt = (x: number, y: number) => [{ x: b.x + x, y: b.y + y }];
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: pt(20, 20) });
+    for (let i = 1; i <= 6; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: pt(20 + i * 20, 20 + i * 12) });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } else {
+    // Other engines: synthetic touch pointer events exercise the same handlers.
+    await page.evaluate(({ x, y }) => {
+      const target = document.elementFromPoint(x + 20, y + 20)!;
+      const ev = (type: string, dx: number, dy: number) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType: "touch", isPrimary: true, clientX: x + dx, clientY: y + dy, button: 0, buttons: type === "pointerup" ? 0 : 1 });
+      target.dispatchEvent(ev("pointerdown", 20, 20));
+      for (let i = 1; i <= 6; i++) target.dispatchEvent(ev("pointermove", 20 + i * 20, 20 + i * 12));
+      target.dispatchEvent(ev("pointerup", 140, 92));
+    }, { x: b.x, y: b.y });
+  }
   await expect(page.locator(".redact-mark:not(.drawing)")).toHaveCount(1);
   expect(await page.locator("#viewerContainer").evaluate((e) => e.scrollTop)).toBe(scrollBefore);
   await expect(page.getByRole("button", { name: "Apply 1 redaction" })).toBeVisible();
