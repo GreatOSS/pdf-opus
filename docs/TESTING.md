@@ -143,6 +143,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-29 — Typed signature, long name
 - “Maximilian Alexander Featherstonehaugh-Worthington”: font previews cut the name off with “…” → previews now shrink to fit (27–30px), full name visible; short names stay 32px. Placed a typed “Jane Q. Public”: ~2.2in wide, centred on the click; saved → Poppler shows it at the same spot. OK.
 
+### 2026-09-29 — Redaction undo/redo
+- tracemonkey p1: R, marked the title, Apply → confirm (mentions undo until close, image caveat) → title text gone from text layer; Ctrl+Z → back; Ctrl+Y → gone again. OK.
+
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: characters outside WinAnsi (e.g. Ł, CJK) are refused with a message, since there's no Unicode font embedding yet; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (Firefox, Safari).
