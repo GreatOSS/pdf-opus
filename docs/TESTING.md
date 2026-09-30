@@ -346,3 +346,11 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 |---|---|
 | Heading in white on a multi-colour striped banner → Edit text → “Annual Report 2026” | **Improved:** before, the old text was removed *and* a single-colour box painted over it, visible on gradients/images. Now the box is only drawn when some old glyphs couldn't be removed (ligatures, unparsed text). Screenshot: stripes intact, new text white; pdftotext shows only the new text; `qpdf --check` clean |
 | Unit: tint preserved when all glyphs removed; cover still drawn when the old text is unknown | OK. unit 76/76, e2e 84/84 |
+
+## 2026-09-30 — Firefox: fill and sign (1366×768, production build)
+
+| Workflow | Result |
+|---|---|
+| IRS W-9: type line 1, Tab to line 2, tick “Individual/sole proprietor” | OK — Tab follows the form order |
+| Add signature → Type tab → name → Place signature → click page | OK, signature placed |
+| Save (download in Firefox) | OK. Field values and checkbox (/1) in the AcroForm, text found by pdftotext, signature rendered by Poppler, `qpdf --check` clean. No page or console errors. No changes needed |
