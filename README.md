@@ -18,6 +18,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 - **Page numbers, headers/footers & watermarks** — stamped into the page content (correct on rotated pages): several number formats, custom header/footer text and Bates numbers (e.g. `ACME-{n:6}`), cover-page option.
 - **Organize pages** — drag thumbnails to reorder, rotate, delete, insert blank pages, insert or append other PDFs, and extract a page range to a new PDF. Forms and annotations survive page edits.
 - **Undo/redo** for both annotations and page edits.
+- **Dark pages** — night reading: pages shown light-on-dark (display only).
 - **Present** — full-screen, one page at a time; arrow keys, Space or click to move, Esc to exit.
 - **Recent files** (opt-in) — listed on the start screen; stored only on this device and erased when you turn the option off.
 - **Save in place** where the browser supports the File System Access API (Chrome, Edge), otherwise download. Unsaved-change protection.

@@ -222,3 +222,13 @@ test("presentation can be left by touch @mobile", async ({ page }) => {
   await expect(page.locator("body")).not.toHaveClass(/presenting/);
   await expect(page.locator("#presentExit")).toBeHidden();
 });
+
+test("dark pages recolours the display only and is remembered", async ({ page }) => {
+  await open(page);
+  await page.locator("#btnMore").click();
+  await page.locator("#miDarkPages").click();
+  await expect(page.locator(".pdfViewer .page").first()).toHaveCSS("filter", /invert/);
+  await page.reload();
+  await expect(page.locator("body")).toHaveClass(/dark-pages/);
+  await expect(page.locator("#miDarkPages")).toHaveText("Normal pages");
+});

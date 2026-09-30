@@ -233,6 +233,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Phone pass: recent files, presentation, print (production build)
 - 390×844 touch on `vite preview`: recent files on → w9, tracemonkey listed (long name ellipsised) → tap reopens; Present; print → 14 pages prepared. Found: (1) the welcome “Open a PDF” button was a bare folder icon on phones — the narrow-screen rule hiding the toolbar Save label also hit it → scoped to the toolbar; (2) presentation could only be left with Esc — on iPhone (no Fullscreen API, no keyboard) there was no way out, and the toast talked about arrow keys. Added a × exit button, left-third tap = back, swipes, touch wording in the toast. Re-test: button reads “Open a PDF”; tap → 2 → 3, left tap → 2, swipe left → 3 (not double-counted), × exits and hides. New @mobile e2e (Pixel 7, iPhone 14). e2e 42/42.
 
+### 2026-09-30 — Dark pages (night reading)
+- More → “Dark pages”: pages shown light-on-dark (CSS invert + hue-rotate on the page element, so text, figures, form fields and marks stay consistent); display only — saving and printing unaffected. tracemonkey p2 in dark mode: text and the Figure 2 diagram legible, colours recognisable. Setting survives reload; menu then reads “Normal pages”. New e2e (3 desktop engines).
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

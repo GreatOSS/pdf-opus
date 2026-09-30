@@ -284,3 +284,6 @@ body.presenting .present-exit { display: grid; place-items: center; position: fi
   width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(40, 40, 40, .55); color: #fff; opacity: .6; cursor: pointer; }
 body.presenting .present-exit:hover, body.presenting .present-exit:focus-visible { opacity: 1; }
 body.presenting .present-exit svg { width: 20px; height: 20px; }
+
+/* Dark pages (night reading): recolour the page display only — hue-rotate keeps colours recognisable. */
+body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }

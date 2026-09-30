@@ -134,6 +134,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miPresent">Present</button>
   <button role="menuitem" id="miSpread">Two-page view</button>
   <button role="menuitem" id="miTheme">Dark mode</button>
+  <button role="menuitem" id="miDarkPages">Dark pages</button>
   <hr />
   <button role="menuitem" id="miProps">Document properties</button>
   <button role="menuitem" id="miShortcuts">Keyboard shortcuts</button>
@@ -1198,6 +1199,13 @@ function applyTheme(t: "light" | "dark") {
   $("#miTheme").textContent = t === "dark" ? "Light mode" : "Dark mode";
   $("#btnTheme0").innerHTML = t === "dark" ? icons.sun : icons.moon;
 }
+// Night reading: show pages light-on-dark. Display only; saving and printing are unaffected.
+function applyDarkPages(on: boolean) {
+  document.body.classList.toggle("dark-pages", on);
+  localStorage.setItem("leaflark.darkPages", on ? "1" : "0");
+  $("#miDarkPages").textContent = on ? "Normal pages" : "Dark pages";
+}
+applyDarkPages(localStorage.getItem("leaflark.darkPages") === "1");
 const toggleTheme = () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 applyTheme((localStorage.getItem("leaflark.theme") as any) ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
 
@@ -1354,6 +1362,7 @@ on("#btnUndo", undo);
 on("#btnRedo", redo);
 on("#btnTheme0", toggleTheme);
 on("#miTheme", toggleTheme);
+on("#miDarkPages", () => applyDarkPages(!document.body.classList.contains("dark-pages")));
 on("#miOpen", pickAndOpen);
 on("#miSaveAs", () => save(true));
 on("#miPresent", startPresentation);
