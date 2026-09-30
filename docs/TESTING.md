@@ -367,3 +367,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | 30 fast wheel flicks → visible pages drawn | within ~20 ms of stopping; 6 page canvases alive, JS heap 53 MB |
 | Rotate / delete a page, then Undo (rewrites the whole file) | 0.75 s / 0.75 s / 0.5 s |
 | Thumbnail of page 800 after scrolling the sidebar | drawn. No errors. No changes needed |
+
+## 2026-09-30 — dark mode: newest UI
+
+| Workflow | Result |
+|---|---|
+| Bookmark ⋮ menu (disabled items, key hints), note dialog with reply box and name field, Notes list, Split dialog — all in dark mode | OK, readable, consistent contrast |
+| Split dialog read “Every 1 pages” | **Fixed:** “Every 1 page” / “Every 2 pages” |

@@ -595,7 +595,8 @@ async function splitDialog() {
   };
   const every = radio("every", "Every");
   const size = el("input", { type: "number", min: "1", max: String(n), value: String(Math.min(saved.size ?? 1, n)), className: "text-input split-size", ariaLabel: "Pages per file" }) as HTMLInputElement;
-  every.row.append(size, el("span", { textContent: "pages" }));
+  const unit = el("span", { textContent: "pages" });
+  every.row.append(size, unit);
   const marks = radio("marks", sections.length > 1 ? `At each bookmark (${sections.length} files)` : "At each bookmark (this document has none)", sections.length < 2);
   const custom = radio("custom", "Custom ranges, one file each");
   const ranges = el("input", { type: "text", className: "text-input", placeholder: "e.g. 1-3, 4-7, 8-", ariaLabel: "Custom ranges", value: saved.ranges ?? "" }) as HTMLInputElement;
@@ -607,6 +608,7 @@ async function splitDialog() {
   };
   const update = () => {
     ranges.hidden = !custom.i.checked;
+    unit.textContent = Math.floor(+size.value) === 1 ? "page" : "pages";
     try { const p = plan(); summary.textContent = `${p.length} file${p.length === 1 ? "" : "s"}${p.length > 1 ? ", saved together in a ZIP file" : ""}.`; }
     catch (e: any) { summary.textContent = e.message; }
   };
