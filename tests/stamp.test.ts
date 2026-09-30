@@ -60,6 +60,38 @@ describe("applyTextEdits", () => {
   });
 });
 
+describe("fixFreeTextAppearances: form fields", () => {
+  const font = () => new Uint8Array(readFileSync(new URL("../public/fonts/DejaVuSans.ttf", import.meta.url)));
+  // What pdf.js leaves behind: the value set, the appearance dropped, NeedAppearances on.
+  const withField = async (value: string, multiline = false) => {
+    const d = await PDFDocument.create();
+    const page = d.addPage([600, 800]);
+    const f = d.getForm().createTextField("name");
+    if (multiline) f.enableMultiline();
+    f.addToPage(page, { x: 100, y: 600, width: 120, height: multiline ? 60 : 20 });
+    const w = f.acroField.getWidgets()[0].dict;
+    f.acroField.dict.set(PDFName.of("V"), PDFHexString.fromText(value));
+    w.delete(PDFName.of("AP"));
+    d.catalog.lookup(PDFName.of("AcroForm"), PDFDict).set(PDFName.of("NeedAppearances"), d.context.obj(true));
+    return d.save({ updateFieldAppearances: false });
+  };
+  const state = async (bytes: Uint8Array) => {
+    const d = await PDFDocument.load(bytes);
+    const w = d.getPage(0).node.Annots()!.lookup(0, PDFDict);
+    return { ap: !!w.get(PDFName.of("AP")), need: !!d.catalog.lookup(PDFName.of("AcroForm"), PDFDict).get(PDFName.of("NeedAppearances")) };
+  };
+  it("draws text fields whose value the standard fonts can't encode", async () => {
+    for (const multi of [false, true]) {
+      const out = await fixFreeTextAppearances(await withField("Zoë Müller-Łukasz, Łódź", multi), { unicodeFont: async () => font() });
+      expect(await state(out)).toEqual({ ap: true, need: false });
+    }
+  });
+  it("leaves plain fields for the viewer to draw", async () => {
+    const src = await withField("plain");
+    expect(await fixFreeTextAppearances(src, { unicodeFont: async () => font() })).toBe(src);
+  });
+});
+
 describe("fixFreeTextAppearances", () => {
   const font = () => new Uint8Array(readFileSync(new URL("../public/fonts/DejaVuSans.ttf", import.meta.url)));
   const withBox = async (text: string) => {

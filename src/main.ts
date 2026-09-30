@@ -355,9 +355,9 @@ async function currentBytes(): Promise<Uint8Array> {
   if (!doc) throw new Error("No document");
   if (doc.pdf.annotationStorage.size === 0) return doc.bytes;
   const bytes = await doc.pdf.saveDocument();
-  // Text boxes with characters outside the standard fonts get no appearance from pdf.js; add one.
+  // Text boxes and form fields with characters outside the standard fonts get no appearance from pdf.js; add one.
   const values = [...(doc.pdf.annotationStorage.serializable.map?.values() ?? [])] as any[];
-  if (!values.some((v) => v?.annotationType === 3 && typeof v.value === "string" && unsupportedChars(v.value.replace(/\s/g, " ")).length)) return bytes;
+  if (!values.some((v) => typeof v?.value === "string" && unsupportedChars(v.value.replace(/\s/g, " ")).length)) return bytes;
   return (await import("./stamp")).fixFreeTextAppearances(bytes, { ...crypt(), unicodeFont: unicodeFontBytes });
 }
 

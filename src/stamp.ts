@@ -1,5 +1,5 @@
 // Page numbers and text watermarks, drawn into page content so every viewer shows them.
-import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFString, StandardFonts, beginText, degrees, endText, popGraphicsState, pushGraphicsState, rgb, setFillingColor, setFontAndSize, setTextMatrix, showText, type PDFFont, type PDFNumber, type PDFPage } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, beginMarkedContent, endMarkedContent, PDFDocument, PDFHexString, PDFName, PDFString, StandardFonts, beginText, degrees, endText, popGraphicsState, pushGraphicsState, rgb, setFillingColor, setFontAndSize, setTextMatrix, showText, type PDFFont, type PDFNumber, type PDFPage } from "@cantoo/pdf-lib";
 import type { CryptOptions } from "./organize";
 import { removeTextFromPage } from "./redact";
 import { unsupportedChars } from "./winansi";
@@ -149,24 +149,45 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
  * standard fonts, so other viewers drop those characters or the whole box. Give such boxes an
  * appearance drawn with a subset of the Unicode fallback font.
  */
+/**
+ * pdf.js saves text boxes (FreeText) and text form fields whose text the standard fonts can't
+ * encode without an appearance, so many viewers show them blank. Draw one with the Unicode font.
+ */
 export async function fixFreeTextAppearances(bytes: Uint8Array, { password = "", unicodeFont }: CryptOptions & { unicodeFont: () => Promise<Uint8Array> }): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
   let font: PDFFont | undefined;
-  let changed = false;
+  let changed = false, blankFields = false;
+  const acroForm = doc.catalog.lookupMaybe(PDFName.of("AcroForm"), PDFDict);
+  // Field attributes can be inherited from parent fields (and DA from the AcroForm).
+  const inherited = (d: PDFDict, key: string) => {
+    for (let n: PDFDict | undefined = d, k = 0; n && k < 32; n = n.lookupMaybe(PDFName.of("Parent"), PDFDict), k++) {
+      const v = n.lookup(PDFName.of(key));
+      if (v !== undefined) return v;
+    }
+    return key === "DA" ? acroForm?.lookup(PDFName.of("DA")) : undefined;
+  };
+  const textOf = (v: unknown) => (v instanceof PDFString || v instanceof PDFHexString ? v.decodeText() : "");
+  const needsFont = (t: string) => !!t && unsupportedChars(t.replace(/\s/g, " ")).length > 0;
   for (const page of doc.getPages()) {
     const annots = page.node.Annots();
     if (!annots) continue;
     for (let i = 0; i < annots.size(); i++) {
       const annot = annots.lookup(i, PDFDict);
-      if (annot.get(PDFName.of("Subtype"))?.toString() !== "/FreeText" || annot.get(PDFName.of("AP"))) continue;
-      const contents = annot.lookup(PDFName.of("Contents"));
-      const text = contents instanceof PDFString || contents instanceof PDFHexString ? contents.decodeText() : "";
-      if (!text || !unsupportedChars(text.replace(/\s/g, " ")).length) continue;
-      if (!font) {
-        const fontkit: any = await import("@cantoo/fontkit");
-        doc.registerFontkit(fontkit.default ?? fontkit);
-        font = await doc.embedFont(await unicodeFont(), { subset: true });
+      if (annot.get(PDFName.of("AP"))) continue;
+      const subtype = annot.get(PDFName.of("Subtype"))?.toString();
+      if (subtype === "/Widget") {
+        if (inherited(annot, "FT")?.toString() !== "/Tx") continue;
+        const value = textOf(inherited(annot, "V"));
+        if (!needsFont(value)) { if (value) blankFields = true; continue; }
+        font ??= await embedUnicode(doc, unicodeFont);
+        annot.set(PDFName.of("AP"), doc.context.obj({ N: doc.context.register(fieldAppearance(doc, font, annot, value, inherited)) }));
+        changed = true;
+        continue;
       }
+      if (subtype !== "/FreeText") continue;
+      const text = textOf(annot.lookup(PDFName.of("Contents")));
+      if (!needsFont(text)) continue;
+      font ??= await embedUnicode(doc, unicodeFont);
       // Size and colour from the default appearance string, e.g. "/Helv 14 Tf 0 g" or "... 1 0 0 rg".
       const da = annot.lookup(PDFName.of("DA"))?.toString() ?? "";
       let size = Number(/([\d.]+)\s+Tf/.exec(da)?.[1]) || 12;
@@ -191,6 +212,58 @@ export async function fixFreeTextAppearances(bytes: Uint8Array, { password = "",
     }
   }
   if (!changed) return bytes;
+  // pdf.js asked viewers to rebuild appearances because it couldn't; ours must not be replaced
+  // by a rebuild in a font that lacks these characters (Poppler drops them, for example).
+  if (acroForm && !blankFields) acroForm.delete(PDFName.of("NeedAppearances"));
   if (password) doc.encrypt({ userPassword: password, ownerPassword: password });
   return doc.save();
+}
+
+async function embedUnicode(doc: PDFDocument, unicodeFont: () => Promise<Uint8Array>) {
+  const fontkit: any = await import("@cantoo/fontkit");
+  doc.registerFontkit(fontkit.default ?? fontkit);
+  return doc.embedFont(await unicodeFont(), { subset: true });
+}
+
+/** Appearance for a text field: size/colour from DA (0 = auto), alignment from Q, wrapping if multiline. */
+function fieldAppearance(doc: PDFDocument, font: PDFFont, widget: PDFDict, value: string, inherited: (d: PDFDict, key: string) => unknown) {
+  const [x1, y1, x2, y2] = widget.lookup(PDFName.of("Rect"), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber());
+  const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+  const da = String(inherited(widget, "DA") ?? "");
+  const rgbM = /([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg/.exec(da);
+  const g = Number(/([\d.]+)\s+g\b/.exec(da)?.[1] ?? 0);
+  const color = rgbM ? rgb(+rgbM[1], +rgbM[2], +rgbM[3]) : rgb(g, g, g);
+  const flags = Number(String(inherited(widget, "Ff") ?? 0)) || 0;
+  const multiline = (flags & 4096) !== 0;
+  const align = Number(String(inherited(widget, "Q") ?? 0)) || 0;
+  const pad = 2;
+  let size = Number(/([\d.]+)\s+Tf/.exec(da)?.[1]) || 0;
+  const lineHeight = () => size * 1.15;
+  const wrap = (): string[] => {
+    const out: string[] = [];
+    for (const para of value.split(/\r\n|\r|\n/)) {
+      if (!multiline) { out.push(para); continue; }
+      let line = "";
+      for (const word of para.split(/(?<=\s)/)) {
+        if (line && font.widthOfTextAtSize(line + word, size) > w - 2 * pad) { out.push(line.trimEnd()); line = word; } else line += word;
+      }
+      out.push(line.trimEnd());
+    }
+    return multiline ? out : [out.join(" ")];
+  };
+  if (!size) size = multiline ? 12 : Math.min(12, (h - 2 * pad) / 1.15) || 10; // auto size
+  let lines = wrap();
+  const widest = () => Math.max(...lines.map((l) => font.widthOfTextAtSize(l, size)));
+  if (!multiline && widest() > w - 2 * pad) size *= (w - 2 * pad) / widest();
+  while (multiline && size > 4 && lines.length * lineHeight() > h - 2 * pad) { size -= 0.5; lines = wrap(); }
+  const ops = [beginMarkedContent("Tx"), pushGraphicsState(), beginText(), setFontAndSize(PDFName.of("F0"), size), setFillingColor(color)];
+  lines.forEach((line, k) => {
+    const lw = font.widthOfTextAtSize(line, size);
+    const x = align === 1 ? (w - lw) / 2 : align === 2 ? w - pad - lw : pad;
+    // Single line: centred vertically, like other viewers; multiline: from the top.
+    const y = multiline ? h - pad - size * 0.95 - k * lineHeight() : (h - size * 0.7) / 2;
+    ops.push(setTextMatrix(1, 0, 0, 1, x, y), showText(font.encodeText(line)));
+  });
+  ops.push(endText(), popGraphicsState(), endMarkedContent());
+  return doc.context.formXObject(ops, { BBox: [0, 0, w, h], Resources: { Font: { F0: font.ref } } });
 }
