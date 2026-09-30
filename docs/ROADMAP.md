@@ -11,5 +11,5 @@ Leaflark's baseline answers the first three by design (free, local, unlimited, n
 4. ~~Compress~~ (done 2026-09-30: Reduce file size) and ~~OCR~~ (done 2026-09-30: on-device; English, German, French, Spanish, Italian, Portuguese, Dutch; cancellable).
 5. ~~Merge AcroForm fields when combining forms~~ (done 2026-09-29).
 6. End-to-end tests (Playwright) for the workflows in docs/TESTING.md; run in CI.
-7. ~~Recent files list (IndexedDB, opt-in)~~ (done 2026-09-30), ~~presentation mode~~ (done 2026-09-30), print cross-browser verification.
+7. ~~Recent files list (IndexedDB, opt-in)~~ (done 2026-09-30), ~~presentation mode~~ (done 2026-09-30), ~~print cross-browser~~ (done 2026-09-30: pages rendered to images instead of the browser’s PDF viewer).
 8. Desktop packaging (Tauri) for native file association — local builds only while the repo is private.

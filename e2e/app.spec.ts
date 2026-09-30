@@ -190,3 +190,14 @@ test("remembers recent files only when asked to", async ({ page }) => {
   await page.locator(".recent-open").click();
   await expect(page).toHaveTitle("report.pdf — Leaflark");
 });
+
+test("prints every page as an image, then cleans up", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => { (window as any).__printed = 0; window.print = () => { (window as any).__printed++; }; });
+  await page.keyboard.press("ControlOrMeta+p");
+  await page.waitForFunction(() => (window as any).__printed === 1);
+  await expect(page.locator("#printContainer .print-page img")).toHaveCount(3);
+  await page.evaluate(() => dispatchEvent(new Event("afterprint")));
+  await expect(page.locator("#printContainer")).toHaveCount(0);
+  await expect(page.locator("#loading")).toBeHidden();
+});

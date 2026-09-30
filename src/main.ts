@@ -416,21 +416,15 @@ async function save(saveAs = false) {
 
 async function print() {
   if (!doc) return;
-  showLoading("Preparing to print…");
+  const signal = { cancelled: false };
+  showLoading("Preparing to print…", () => { signal.cancelled = true; });
   try {
-    const bytes = await currentBytes();
-    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
-    const frame = el("iframe", { className: "print-frame", src: url }) as HTMLIFrameElement;
-    frame.onload = () => {
-      hideLoading();
-      try { frame.contentWindow!.focus(); frame.contentWindow!.print(); }
-      catch { window.open(url, "_blank"); }
-      setTimeout(() => { frame.remove(); URL.revokeObjectURL(url); }, 60_000);
-    };
-    document.body.append(frame);
+    const { printDocument } = await import("./print");
+    await printDocument(doc.pdf, (done, total) => { if (total > 3) $("#loadingText").textContent = `Preparing to print… page ${Math.min(done + 1, total)} of ${total}`; }, signal);
   } catch (e: any) {
-    hideLoading();
     toast(`Couldn’t print: ${e?.message ?? e}`, "error");
+  } finally {
+    hideLoading();
   }
 }
 

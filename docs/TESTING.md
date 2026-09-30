@@ -224,7 +224,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Recent files (opt-in)
 - Welcome screen: “Remember recent files on this device” (off by default; turning it off erases the list). Chrome/Edge keep only the file handle (re-asks permission); elsewhere a copy (≤50 MB) in IndexedDB. Hands-on (Chromium): off → open/close tracemonkey → nothing listed; on → open w9, tracemonkey → reload → list “tracemonkey.pdf, w9.pdf” with times → click w9 → reopens, moves to top → × removes an entry → uncheck → list hidden, store empty. New e2e test failed on WebKit: Blobs can't be stored in IndexedDB in ephemeral/private sessions → store ArrayBuffer instead; passes on Chromium, WebKit, Firefox. unit 52/52, e2e 34/34.
 
+### 2026-09-30 — Printing rebuilt
+- Print used to load the PDF into a hidden iframe and call the browser's PDF viewer — downloads instead of printing on Android Chrome (no viewer) and wherever the viewer is disabled, and known to print blank/first page only from iframes in Safari. Now every page is rendered at 150 dpi (print intent, current form values/annotations) into a print-only container (@page sized from page 1), with progress + Cancel; cleaned up on afterprint. Verified by stubbing window.print and printing the print-media page to PDF in Chromium: f1040 with typed “Zoë Printtest” + checked box → 2 Letter pages, both values visible; tracemonkey → 14 pages, ~1 s; 16:9 slides → 960×540 pages. New e2e test in Chromium, WebKit, Firefox. Remaining: real printers/dialogs untested (headless).
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
-- Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
+- Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
 - Inferred form-field labels are heuristic; small boxes inside dense rows can pick up a neighbour's label.
