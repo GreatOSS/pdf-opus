@@ -158,3 +158,19 @@ test("redaction marks can be drawn with touch @mobile", async ({ page, browserNa
   expect(await page.locator("#viewerContainer").evaluate((e) => e.scrollTop)).toBe(scrollBefore);
   await expect(page.getByRole("button", { name: "Apply 1 redaction" })).toBeVisible();
 });
+
+test("presents one page at a time and restores the view", async ({ page }) => {
+  await open(page);
+  await page.locator("#btnMore").click();
+  await page.locator("#miPresent").click();
+  await expect(page.locator("body")).toHaveClass(/presenting/);
+  await expect(page.locator(".toolbar")).toBeHidden();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press(" ");
+  await expect(page.locator(".page-input")).toHaveValue("3");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("body")).not.toHaveClass(/presenting/);
+  await expect(page.locator(".toolbar")).toBeVisible();
+  await expect(page.locator(".page-input")).toHaveValue("2");
+});

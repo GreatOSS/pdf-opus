@@ -128,6 +128,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miOcr">Recognize text (OCR)…</button>
   <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <hr />
+  <button role="menuitem" id="miPresent">Present</button>
   <button role="menuitem" id="miSpread">Two-page view</button>
   <button role="menuitem" id="miTheme">Dark mode</button>
   <hr />
@@ -1323,6 +1324,7 @@ on("#btnTheme0", toggleTheme);
 on("#miTheme", toggleTheme);
 on("#miOpen", pickAndOpen);
 on("#miSaveAs", () => save(true));
+on("#miPresent", startPresentation);
 on("#miPrint", print);
 on("#miExtract", extractDialog);
 on("#miMerge", () => doc && insertPdfAt(doc.pdf.numPages));
@@ -1370,6 +1372,55 @@ window.addEventListener("drop", (e) => {
 });
 
 // Keyboard shortcuts.
+// ───────────────────────────── Presentation ─────────────────────────────
+// Full screen, one page at a time, fitted; keys, clicks and the Esc key work like slide software.
+let presenting: { scroll: number; spread: number; scale: string } | null = null;
+async function startPresentation() {
+  if (!doc || presenting) return;
+  if (currentMode !== Mode.NONE) setMode(Mode.NONE, true);
+  toggleMenu(false);
+  presenting = { scroll: viewer.scrollMode, spread: viewer.spreadMode, scale: viewer.currentScaleValue || "auto" };
+  const page = viewer.currentPageNumber;
+  document.body.classList.add("presenting");
+  viewer.scrollMode = 3; // one page at a time
+  viewer.spreadMode = 0;
+  viewer.currentScaleValue = "page-fit";
+  viewer.currentPageNumber = page;
+  // Not available everywhere (e.g. iPhone Safari): the in-window view still works there.
+  try { await document.documentElement.requestFullscreen?.({ navigationUI: "hide" }); } catch { /* stay in the window */ }
+  container.focus();
+  toast("Presenting — use the arrow keys or click to move, Esc to exit.");
+}
+function stopPresentation() {
+  if (!presenting) return;
+  const { scroll, spread, scale } = presenting;
+  presenting = null;
+  document.body.classList.remove("presenting");
+  const page = viewer.currentPageNumber;
+  viewer.scrollMode = scroll;
+  viewer.spreadMode = spread;
+  viewer.currentScaleValue = scale;
+  viewer.currentPageNumber = page;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) stopPresentation(); });
+container.addEventListener("click", (e) => {
+  if (!presenting || (e.target as HTMLElement).closest("a, input, textarea, select, button")) return;
+  e.shiftKey ? viewer.previousPage() : viewer.nextPage();
+});
+window.addEventListener("keydown", (e) => {
+  if (!presenting || document.querySelector("dialog[open]")) return;
+  const next = ["ArrowRight", "ArrowDown", "PageDown", " ", "Enter", "n"], prev = ["ArrowLeft", "ArrowUp", "PageUp", "Backspace", "p"];
+  if (next.includes(e.key)) viewer.nextPage();
+  else if (prev.includes(e.key)) viewer.previousPage();
+  else if (e.key === "Home") viewer.currentPageNumber = 1;
+  else if (e.key === "End") viewer.currentPageNumber = viewer.pagesCount;
+  else if (e.key === "Escape") stopPresentation();
+  else return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+}, true);
+
 window.addEventListener("keydown", (e) => {
   const t = e.target as HTMLElement;
   const typing = t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);

@@ -218,6 +218,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Headers/footers & Bates numbers
 - More → “Page numbers, headers & watermark…”: new Format “Custom text…” shows a Text field ({n}, {n:6} zero-padded, {total}); new position Top left. tracemonkey: “ACME-{n:6} · Łódź office”, Top right, start 42 → saved: pdftotext p1 “ACME-000042 · Łódź office”, p14 “ACME-000055 …”; non-WinAnsi text uses the DejaVu subset (pdffonts), Poppler render clean. Template field hidden unless Custom is chosen. unit 52/52.
 
+### 2026-09-30 — Presentation mode
+- More → Present: full screen (where the browser allows), toolbar/sidebar hidden, black background, one page fitted. tracemonkey: →, Space → p3; click → p4; ← → p3; Esc → leaves full screen, layout and “Automatic” zoom restored, stays on p3. 16:9 slide deck (generated 960×540): first version sat at the top (38 px above / 66 px below) → viewer centred and its padding removed → 52/52 px. New e2e test (desktop Chromium, WebKit, Firefox). unit 52/52, e2e 31/31.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
