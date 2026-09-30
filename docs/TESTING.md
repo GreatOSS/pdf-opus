@@ -310,3 +310,12 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; text drawn rotated within the page (not via page rotation) isn't editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
 - Inferred form-field labels are heuristic; small boxes inside dense rows can pick up a neighbour's label.
+
+## 2026-09-30 — phones: newer features (production build, WebKit iPhone 14 + Chromium Pixel 7, touch)
+
+| Workflow | Result |
+|---|---|
+| Labelled PDF: page box shows “Cover”; toolbar fits | OK on both (the “n of N” count is hidden on phones by design) |
+| Split dialog via ⋮ menu: every 4 pages → summary, ZIP download | OK — no horizontal overflow, `labels (split).zip` |
+| Bookmarks by touch: add, rename via row action (always visible, 0.7 opacity) | OK, outline updated |
+| Page errors | None |
