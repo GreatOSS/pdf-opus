@@ -615,6 +615,25 @@ function updateUndoButtons() {
   ($("#btnUndo") as HTMLButtonElement).disabled = !editorState.hasSomethingToUndo && pageUndo.length === 0;
   ($("#btnRedo") as HTMLButtonElement).disabled = !editorState.hasSomethingToRedo && pageRedo.length === 0;
 }
+// Form fields without a tooltip would be announced by their internal names; use the printed label instead.
+eventBus.on("annotationlayerrendered", async ({ source }: any) => {
+  const controls = [...(source.div as HTMLElement).querySelectorAll<HTMLElement>(".annotationLayer :is(input, textarea, select)[data-element-id]")]
+    .filter((c) => !c.getAttribute("aria-label") && !c.title);
+  if (!controls.length) return;
+  const page = source.pdfPage;
+  const [annots, tc] = await Promise.all([page.getAnnotations(), page.getTextContent()]);
+  const { labelFor } = await import("./fieldlabels");
+  const items = (tc.items as any[]).filter((t) => typeof t.str === "string")
+    .map((t) => ({ str: t.str, x: t.transform[4], y: t.transform[5], w: t.width, h: t.height || Math.abs(t.transform[3]) }));
+  const byId = new Map((annots as any[]).map((a) => [a.id, a]));
+  for (const c of controls) {
+    const a = byId.get(c.dataset.elementId);
+    if (!a?.rect) continue;
+    const label = labelFor(a.rect, items, a.checkBox || a.radioButton ? "check" : "text");
+    if (label) c.setAttribute("aria-label", label);
+  }
+});
+
 eventBus.on("editingstateschanged", ({ details }: any) => {
   editorState = { ...editorState, ...details };
   updateUndoButtons();

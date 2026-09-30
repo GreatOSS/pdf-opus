@@ -197,7 +197,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Keyboard-only pass (W-9)
 - Tab from page start: sidebar resizer → page → link → every form field in reading order (text fields, checkbox group, textarea) → next page; focus ring on all interactive stops. Finding: W-9 fields have no /TU tooltip, so screen readers only get internal names (“topmostSubform[0].Page1[0].f1_01[0]”); pdf.js uses /TU when present. Not fixed (would need labels inferred from nearby text).
 
+### 2026-09-30 — Accessible names for form fields
+- Fields without a /TU tooltip now get an aria-label from the printed label (checkboxes: text to the right; text fields: text just before on the same line, else the label paragraph above, else further left). Checked the labels exposed on W-9 and 1040 p1: W-9 “1 Name of entity/individual. An entry is required…”, “2 Business name/…”, all 3a checkboxes (“C corporation”, “Partnership”…), “Exempt payee code (if any)”, “6 City, state, and ZIP code”, “Employer identification number”; 1040 “…other tax year beginning”, “, 2025, ending”, “Your first name and middle initial”, “Last name”, “Home address …”. Imperfect: W-9 LLC classification box → “Trust/estate”, first SSN digit box → nearby paragraph, 1040 date comb boxes → “Deceased MM / DD /…”. Fields with /TU keep pdf.js's label. unit 49/49.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
-- Form fields without a /TU tooltip get no accessible name beyond the internal field name; consider inferring labels from adjacent text.
+- Inferred form-field labels are heuristic; small boxes inside dense rows can pick up a neighbour's label.
