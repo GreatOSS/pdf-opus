@@ -13,4 +13,4 @@ Leaflark's baseline answers the first three by design (free, local, unlimited, n
 6. End-to-end tests (Playwright) for the workflows in docs/TESTING.md; run in CI.
 7. ~~Recent files list (IndexedDB, opt-in)~~ (done 2026-09-30), ~~presentation mode~~ (done 2026-09-30), ~~print cross-browser~~ (done 2026-09-30: pages rendered to images instead of the browser’s PDF viewer).
 8. Desktop packaging (Tauri) for native file association — local builds only while the repo is private.
-9. ~~Sticky notes~~ (done 2026-09-30: add/edit/delete /Text notes). Notes list in the sidebar done 2026-09-30. Next: replies, author name.
+9. ~~Sticky notes~~ (done 2026-09-30: add/edit/delete /Text notes). Notes list in the sidebar done 2026-09-30. Author name done 2026-09-30. Next: replies.

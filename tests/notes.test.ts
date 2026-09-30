@@ -15,17 +15,19 @@ const annotsOf = async (b: Uint8Array) => {
 
 describe("sticky notes", () => {
   it("adds a Text annotation with Unicode contents, kept on the page", async () => {
-    const out = await addNote(await blank(), 0, [595, 5], "Zoë — check ✓");
+    const out = await addNote(await blank(), 0, [595, 5], "Zoë — check ✓", { author: "Ana Łucja" });
     const { list } = await annotsOf(out);
     expect(list).toHaveLength(1);
     const a = list[0].dict;
     expect(a.get(PDFName.of("Subtype"))).toBe(PDFName.of("Text"));
     expect((a.lookup(PDFName.of("Contents")) as PDFHexString).decodeText()).toBe("Zoë — check ✓");
+    expect((a.lookup(PDFName.of("T")) as PDFHexString).decodeText()).toBe("Ana Łucja");
     const rect = (a.lookup(PDFName.of("Rect")) as PDFArray).asArray().map((n: any) => n.asNumber());
     expect(rect).toEqual([580, 0, 600, 20]);
   });
   it("edits and deletes a note by pdf.js id", async () => {
     let b = await addNote(await blank(), 0, [100, 700], "first");
+    expect((await annotsOf(b)).list[0].dict.get(PDFName.of("T"))).toBeUndefined();
     const { list } = await annotsOf(b);
     const ref = list[0].ref as any;
     const id = `${ref.objectNumber}R${ref.generationNumber || ""}`;

@@ -260,6 +260,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Notes list in the sidebar
 - New “Notes” sidebar tab: every note, plus highlights/shapes/text boxes that carry a comment, in page order (top to bottom), with page, kind, author and date; click → jumps there, flashes the note and opens its popup. Loaded when the tab is opened; refreshes after edits. tracemonkey: empty state → notes on p1 and p3 appeared live as they were added; from p10, clicking the p3 entry → page 3, popup “Is this figure up to date?” open. big800: whole document scanned in ~0.1 s. Found: (1) with a third tab the sidebar tabs overflowed the default 207 px width and scrolled sideways, hiding “Pages” → the tabs drop their icons below 250 px (container query), fits on desktop and phone; (2) the first version didn't open the popup (matched the wrong element) → fixed. e2e 51/51 (3 engines), unit 61/61.
 
+### 2026-09-30 — Note author name
+- Add note dialog now has “Your name” (optional, remembered on this device) → written as the note's /T, which Acrobat, Preview and pdf.js show as the author. Verified: “Ana Łucja” → second note prefilled; edit dialog title “Note by Ana Łucja”; Notes tab “Page 1 · Note · Ana Łucja · …”; pdf.js popup header shows the name. Found: the note dialog scrolled sideways (text box fixed at 420 px inside a 392 px dialog body, since the sticky-notes change) → text box now fills the dialog; checked at 1280 and 390 px, no overflow (asserted in e2e). e2e 51/51, unit 61/61.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

@@ -19,7 +19,7 @@ async function save(doc: PDFDocument, password: string) {
 }
 
 /** Add a note whose icon's top-left corner is at (x, y) in PDF user space. */
-export async function addNote(bytes: Uint8Array, pageIndex: number, [x, y]: [number, number], text: string, { password = "" }: CryptOptions = {}): Promise<Uint8Array> {
+export async function addNote(bytes: Uint8Array, pageIndex: number, [x, y]: [number, number], text: string, { password = "", author = "" }: CryptOptions & { author?: string } = {}): Promise<Uint8Array> {
   const doc = await load(bytes, password);
   const page = doc.getPage(pageIndex);
   // Keep the icon on the page even when clicked near the right/bottom edge.
@@ -39,6 +39,7 @@ export async function addNote(bytes: Uint8Array, pageIndex: number, [x, y]: [num
     M: now,
     CreationDate: now,
   });
+  if (author.trim()) annot.set(PDFName.of("T"), PDFHexString.fromText(author.trim()));
   const ref = doc.context.register(annot);
   let annots = page.node.lookupMaybe(PDFName.of("Annots"), PDFArray);
   if (!annots) { annots = doc.context.obj([]); page.node.set(PDFName.of("Annots"), annots); }

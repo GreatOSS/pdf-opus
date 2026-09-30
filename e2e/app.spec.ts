@@ -260,9 +260,11 @@ test("notes tab lists notes and jumps to them", async ({ page }) => {
   const box = (await page.locator('.page[data-page-number="1"]').boundingBox())!;
   await page.mouse.click(box.x + 300, box.y + 200);
   await page.getByRole("textbox", { name: "Note" }).fill("Listed note");
+  await page.getByRole("textbox", { name: "Your name" }).fill("Ana Łucja");
+  expect(await page.locator("dialog").evaluate((d) => d.scrollWidth <= d.clientWidth)).toBe(true);
   await page.getByRole("button", { name: "Add note" }).last().click();
   await expect(page.locator(".note-item")).toHaveCount(1);
-  await expect(page.locator(".note-item")).toContainText("Page 1 · Note");
+  await expect(page.locator(".note-item")).toContainText("Page 1 · Note · Ana Łucja");
   await page.keyboard.press("Escape");
   await page.locator(".note-item").click();
   await expect(page.locator(".popupAnnotation").first()).toContainText("Listed note");

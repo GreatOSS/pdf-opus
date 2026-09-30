@@ -1008,12 +1008,16 @@ async function noteDialog(title: string, text: string, canDelete: boolean): Prom
   // Ctrl/⌘+Enter saves; plain Enter makes a new line.
   area.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); area.form?.requestSubmit(); } });
   setTimeout(() => area.focus(), 0);
+  // New notes carry the author's name (shown by every PDF app); remembered on this device.
+  const name = el("input", { type: "text", className: "text-input", value: localStorage.getItem("leaflark.author") ?? "", placeholder: "Optional", autocomplete: "name", maxLength: 80 }) as HTMLInputElement;
+  const body = el("div", { className: "stamp-form note-form" }, canDelete ? [area] : [area, el("label", { className: "form-row" }, [el("span", { textContent: "Your name" }), name])]);
   const r = await showDialog<string>({
-    title, body: area,
+    title, body,
     buttons: [...(canDelete ? [{ label: "Delete note", value: "delete" }] : []), { label: "Cancel", value: "cancel" }, { label: canDelete ? "Save" : "Add note", value: "ok", primary: true }],
   });
   if (r === "delete") return null;
   if (r !== "ok") return undefined;
+  if (!canDelete) localStorage.setItem("leaflark.author", name.value.trim());
   return area.value.trim() || (canDelete ? null : undefined);
 }
 container.addEventListener("pointerdown", async (e) => {
@@ -1031,7 +1035,8 @@ container.addEventListener("pointerdown", async (e) => {
   if (id) {
     const annots = await (await doc.pdf.getPage(idx + 1)).getAnnotations();
     const a = annots.find((x: any) => x.id === id);
-    const text = await noteDialog("Note", a?.contentsObj?.str ?? "", true);
+    const author = (a?.titleObj?.str ?? "").trim();
+    const text = await noteDialog(author ? `Note by ${author}` : "Note", a?.contentsObj?.str ?? "", true);
     if (text === undefined || text === (a?.contentsObj?.str ?? "")) return;
     mutatePages(text === null ? "Deleting note" : "Updating note", (b) => notes.updateNote(b, idx, id, text, crypt()), idx + 1, true);
     return;
@@ -1040,7 +1045,7 @@ container.addEventListener("pointerdown", async (e) => {
   const pt = view.viewport.convertToPdfPoint(e.clientX - r.left - pageEl.clientLeft, e.clientY - r.top - pageEl.clientTop) as [number, number];
   const text = await noteDialog("Add note", "", false);
   if (!text) return;
-  mutatePages("Adding note", (b) => notes.addNote(b, idx, pt, text, crypt()), idx + 1, true);
+  mutatePages("Adding note", (b) => notes.addNote(b, idx, pt, text, { ...crypt(), author: localStorage.getItem("leaflark.author") ?? "" }), idx + 1, true);
 }, true);
 
 // ───────────────────────────── Redaction ─────────────────────────────
