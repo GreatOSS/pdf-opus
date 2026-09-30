@@ -153,10 +153,13 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 - Installed Playwright Firefox 155; all 8 desktop e2e tests pass (open, bad file, find, page edits + undo, text box save, page numbers, Edit text, redaction). Firefox project added to CI. WebKit (Safari engine; needed ~135 system libs via agent-packages): all 8 pass too, added to CI. iPhone 14 profile (WebKit) runs the @mobile tests (layout, touch redaction via synthetic touch pointer events — CDP touch is Chromium-only): pass.
 
 ### 2026-09-30 — Edit text with Unicode
-- Edit text now embeds a subset of DejaVu Sans (loaded on demand, +~11 KB per file) for characters outside WinAnsi. tracemonkey p1: title → “Łódź ✓ Ωμέγα” → Poppler renders it and pdftotext extracts it; pdffonts shows DejaVuSans CID TrueType embedded. “日本” still refused with a message (not in DejaVu), box stays open. Found on the way: this pdf-lib fork's `encodeText` never threw, so the old “?” fallback never fired — now uses an explicit WinAnsi check. Limits: the fallback is DejaVu Sans Regular only (a bold serif heading becomes regular sans); text boxes (pdf.js FreeText) still only warn.
+- Edit text now embeds a subset of DejaVu Sans (loaded on demand, +~11 KB per file) for characters outside WinAnsi. tracemonkey p1: title → “Łódź ✓ Ωμέγα” → Poppler renders it and pdftotext extracts it; pdffonts shows DejaVuSans CID TrueType embedded. “日本” still refused with a message (not in DejaVu), box stays open. Found on the way: this pdf-lib fork's `encodeText` never threw, so the old “?” fallback never fired — now uses an explicit WinAnsi check. Limits: the fallback is DejaVu Sans Regular only (a bold serif heading becomes regular sans); text boxes: see next entry.
 
 ### 2026-09-30 — Centred text detection
 - tracemonkey's long centred title wasn't detected as centred (needed ≥8% page-width indent; it's 26pt in) → replacement was left-aligned. Now: centred when indented ≥3% and the gaps on both sides are equal (vs text block or page). Unit tests for title, short heading, columns, first-line indent, flush-left. Re-checked: edit box opens centred, “Łódź Tracing ✓” lands centred above “Languages”.
+
+### 2026-09-30 — Text boxes with Unicode
+- On save, text boxes pdf.js left without an appearance (non-WinAnsi text) now get one drawn with the DejaVu subset. tracemonkey: “Reviewed ✓ Łódź” + “Ωμέγα line 2” → Poppler renders both lines (first try clipped “Łódź”: pdf.js sized the box for Helvetica → text now shrinks to fit the box width). ASCII boxes keep pdf.js's own appearance. “日本 ✓” → one warning (CJK not in DejaVu; was shown 2–3× — toasts now de-duplicate). Reopened the saved file in Leaflark: boxes display.
 
 ### Known gaps / next
 - Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.

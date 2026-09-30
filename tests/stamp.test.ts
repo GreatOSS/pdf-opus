@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { PDFDict, PDFDocument, PDFName, degrees } from "@cantoo/pdf-lib";
-import { applyTextEdits, formatNumber, stampPages, visualToUser } from "../src/stamp";
+import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFString, degrees } from "@cantoo/pdf-lib";
+import { applyTextEdits, fixFreeTextAppearances, formatNumber, stampPages, visualToUser } from "../src/stamp";
 
 describe("visualToUser", () => {
   const box: [number, number, number, number] = [0, 0, 600, 800];
@@ -57,5 +57,28 @@ describe("applyTextEdits", () => {
     expect(out.length).toBeLessThan(font.length / 4); // a subset, not the whole 760 KB font
     // ASCII-only edits keep using the standard fonts (no embedding).
     expect(await embedded(await applyTextEdits(await d.save(), [{ ...edit, text: "Lodz" }], { unicodeFont: async () => font }))).toBe(0);
+  });
+});
+
+describe("fixFreeTextAppearances", () => {
+  const font = () => new Uint8Array(readFileSync(new URL("../public/fonts/DejaVuSans.ttf", import.meta.url)));
+  const withBox = async (text: string) => {
+    const d = await PDFDocument.create();
+    const page = d.addPage([600, 800]);
+    const annot = d.context.obj({ Type: "Annot", Subtype: "FreeText", Rect: [100, 600, 180, 620], DA: PDFString.of("/Helv 14 Tf 0 g"), Contents: PDFHexString.fromText(text) });
+    page.node.set(PDFName.of("Annots"), d.context.obj([d.context.register(annot)]));
+    return d.save();
+  };
+  const ap = async (bytes: Uint8Array) => {
+    const d = await PDFDocument.load(bytes);
+    return d.getPage(0).node.Annots()!.lookup(0, PDFDict).get(PDFName.of("AP"));
+  };
+  it("adds an appearance for text boxes with non-WinAnsi characters", async () => {
+    const out = await fixFreeTextAppearances(await withBox("Reviewed ✓ Łódź"), { unicodeFont: async () => font() });
+    expect(await ap(out)).toBeTruthy();
+  });
+  it("leaves plain text boxes untouched", async () => {
+    const src = await withBox("plain");
+    expect(await fixFreeTextAppearances(src, { unicodeFont: async () => font() })).toBe(src);
   });
 });

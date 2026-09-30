@@ -1,5 +1,5 @@
 // Page numbers and text watermarks, drawn into page content so every viewer shows them.
-import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFString, StandardFonts, beginText, degrees, endText, popGraphicsState, pushGraphicsState, rgb, setFillingColor, setFontAndSize, setTextMatrix, showText, type PDFFont, type PDFNumber, type PDFPage } from "@cantoo/pdf-lib";
 import type { CryptOptions } from "./organize";
 import { removeTextFromPage } from "./redact";
 import { unsupportedChars } from "./winansi";
@@ -140,6 +140,57 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
     const x = e.align === "center" ? rx + rw / 2 - font.widthOfTextAtSize(safe, e.size) / 2 : e.x;
     if (safe.trim()) page.drawText(safe, { x, y: e.y, size: e.size, font, color: rgb(...e.color) });
   }
+  if (password) doc.encrypt({ userPassword: password, ownerPassword: password });
+  return doc.save();
+}
+
+/**
+ * pdf.js writes no appearance stream for text boxes (FreeText) containing characters outside the
+ * standard fonts, so other viewers drop those characters or the whole box. Give such boxes an
+ * appearance drawn with a subset of the Unicode fallback font.
+ */
+export async function fixFreeTextAppearances(bytes: Uint8Array, { password = "", unicodeFont }: CryptOptions & { unicodeFont: () => Promise<Uint8Array> }): Promise<Uint8Array> {
+  const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
+  let font: PDFFont | undefined;
+  let changed = false;
+  for (const page of doc.getPages()) {
+    const annots = page.node.Annots();
+    if (!annots) continue;
+    for (let i = 0; i < annots.size(); i++) {
+      const annot = annots.lookup(i, PDFDict);
+      if (annot.get(PDFName.of("Subtype"))?.toString() !== "/FreeText" || annot.get(PDFName.of("AP"))) continue;
+      const contents = annot.lookup(PDFName.of("Contents"));
+      const text = contents instanceof PDFString || contents instanceof PDFHexString ? contents.decodeText() : "";
+      if (!text || !unsupportedChars(text.replace(/\s/g, " ")).length) continue;
+      if (!font) {
+        const fontkit: any = await import("@cantoo/fontkit");
+        doc.registerFontkit(fontkit.default ?? fontkit);
+        font = await doc.embedFont(await unicodeFont(), { subset: true });
+      }
+      // Size and colour from the default appearance string, e.g. "/Helv 14 Tf 0 g" or "... 1 0 0 rg".
+      const da = annot.lookup(PDFName.of("DA"))?.toString() ?? "";
+      let size = Number(/([\d.]+)\s+Tf/.exec(da)?.[1]) || 12;
+      const rgbM = /([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg/.exec(da);
+      const g = Number(/([\d.]+)\s+g\b/.exec(da)?.[1] ?? 0);
+      const color = rgbM ? rgb(+rgbM[1], +rgbM[2], +rgbM[3]) : rgb(g, g, g);
+      const [x1, y1, x2, y2] = annot.lookup(PDFName.of("Rect"), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber());
+      const lines = text.split(/\r\n|\r|\n/);
+      // pdf.js sized the box for its own font; shrink if the fallback font's text is wider.
+      const widest = Math.max(...lines.map((l) => font!.widthOfTextAtSize(l, size)));
+      if (widest > x2 - x1) size *= (x2 - x1) / widest;
+      const lineHeight = size * 1.2;
+      const ops = [pushGraphicsState(), beginText(), setFontAndSize(PDFName.of("F0"), size), setFillingColor(color)];
+      lines.forEach((line, k) => {
+        ops.push(setTextMatrix(1, 0, 0, 1, 0, y2 - y1 - size * 0.95 - k * lineHeight)); // baselines from the top
+        ops.push(showText(font!.encodeText(line)));
+      });
+      ops.push(endText(), popGraphicsState());
+      const ap = doc.context.formXObject(ops, { BBox: [0, 0, x2 - x1, y2 - y1], Resources: { Font: { F0: font.ref } } });
+      annot.set(PDFName.of("AP"), doc.context.obj({ N: doc.context.register(ap) }));
+      changed = true;
+    }
+  }
+  if (!changed) return bytes;
   if (password) doc.encrypt({ userPassword: password, ownerPassword: password });
   return doc.save();
 }

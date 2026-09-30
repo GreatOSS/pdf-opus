@@ -17,6 +17,8 @@ export function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<
 }
 
 export function toast(message: string, kind: "info" | "error" = "info") {
+  // Don't stack identical messages (e.g. several events reporting the same problem).
+  if ([...document.querySelectorAll("#toasts .toast:not(.out)")].some((t) => t.textContent === message)) return;
   const t = el("div", { className: `toast ${kind}`, role: kind === "error" ? "alert" : "status", textContent: message });
   document.getElementById("toasts")!.append(t);
   const ttl = kind === "error" ? 7000 : 3000;

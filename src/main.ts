@@ -12,7 +12,7 @@ const organize = () => import("./organize");
 import { Thumbnails } from "./thumbnails";
 import { chooseSignature, dataUrlToFile } from "./signature";
 import { setupEditText, unsupportedChars } from "./edittext";
-import { unicodeFontBytes } from "./unifont";
+import { missingGlyphs, unicodeFontBytes } from "./unifont";
 import { setupRedact } from "./redactui";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
@@ -348,7 +348,11 @@ window.addEventListener("beforeunload", (e) => { if (doc?.dirty && !skipUnloadPr
 async function currentBytes(): Promise<Uint8Array> {
   if (!doc) throw new Error("No document");
   if (doc.pdf.annotationStorage.size === 0) return doc.bytes;
-  return doc.pdf.saveDocument();
+  const bytes = await doc.pdf.saveDocument();
+  // Text boxes with characters outside the standard fonts get no appearance from pdf.js; add one.
+  const values = [...(doc.pdf.annotationStorage.serializable.map?.values() ?? [])] as any[];
+  if (!values.some((v) => v?.annotationType === 3 && typeof v.value === "string" && unsupportedChars(v.value.replace(/\s/g, " ")).length)) return bytes;
+  return (await import("./stamp")).fixFreeTextAppearances(bytes, { ...crypt(), unicodeFont: unicodeFontBytes });
 }
 
 async function save(saveAs = false) {
@@ -816,13 +820,15 @@ const editText = setupEditText({
   },
 });
 
-// pdf.js can't write an appearance for text boxes with characters outside the standard
-// fonts, so other PDF apps may drop them. Tell the user when they finish typing.
+// Text boxes with characters outside the standard fonts are drawn with the Unicode fallback font
+// when saving (see currentBytes). Warn about characters that font can't draw either (e.g. CJK).
 container.addEventListener("focusout", (e) => {
   const box = (e.target as HTMLElement).closest?.(".freeTextEditor");
   if (!box || box.contains((e as FocusEvent).relatedTarget as Node | null)) return;
-  const bad = unsupportedChars((box.textContent ?? "").replace(/\s/g, " "));
-  if (bad.length) toast(`Other PDF apps may not show ${bad.slice(0, 5).join(" ")} in this text box. If others need to see it, use other characters.`, "error");
+  const outside = unsupportedChars((box.textContent ?? "").replace(/\s/g, " "));
+  if (outside.length) missingGlyphs(outside).then((bad) => {
+    if (bad.length) toast(`Other PDF apps may not show ${bad.slice(0, 5).join(" ")} in this text box. If others need to see it, use other characters.`, "error");
+  }, () => {});
 });
 
 // ───────────────────────────── Redaction ─────────────────────────────
