@@ -45,10 +45,12 @@ export class Thumbnails {
       item.dataset.index = String(i);
       const box = el("div", { className: "thumb-img" });
       box.style.aspectRatio = "0.7727";
-      const tools = el("div", { className: "thumb-tools" });
-      const rot = el("button", { type: "button", className: "mini-btn", title: "Rotate right", ariaLabel: `Rotate page ${i + 1}`, tabIndex: -1, innerHTML: icons.rotateCw });
+      // Mouse shortcuts only: a listbox option can't contain buttons, and the same actions are in the
+      // toolbar above and on the keyboard (Del, Alt+↑/↓), so keep them out of the accessibility tree.
+      const tools = el("div", { className: "thumb-tools", ariaHidden: "true" });
+      const rot = el("span", { className: "mini-btn", title: "Rotate right", innerHTML: icons.rotateCw });
       rot.onclick = (e) => { e.stopPropagation(); this.cb.onRotate(this.sel.has(i) ? this.selected() : [i], 90); };
-      const del = el("button", { type: "button", className: "mini-btn", title: "Delete page", ariaLabel: `Delete page ${i + 1}`, tabIndex: -1, innerHTML: icons.trash });
+      const del = el("span", { className: "mini-btn", title: "Delete page", innerHTML: icons.trash });
       del.onclick = (e) => { e.stopPropagation(); if (!this.sel.has(i)) this.select(i, "single"); this.cb.onDelete(); };
       tools.append(rot, del);
       item.append(box, tools, el("span", { className: "thumb-label", textContent: String(i + 1) }));

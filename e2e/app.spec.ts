@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PDFDocument, StandardFonts, PDFName } from "@cantoo/pdf-lib";
+import AxeBuilder from "@axe-core/playwright";
 
 async function samplePdf(pages = 3): Promise<Buffer> {
   const doc = await PDFDocument.create();
@@ -403,4 +404,19 @@ test("uses the document's printed page numbers", async ({ page }) => {
   await page.locator("#pageInput").press("Enter");
   await expect(page.locator("#pageCount")).toHaveText("(5 of 7)");
   await expect(page.locator(".thumb-label").nth(2)).toHaveText("iii (3)");
+});
+
+test("has no automatically detectable accessibility problems", async ({ page }) => {
+  const check = async (include?: string) => {
+    let b = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).exclude(".pdfViewer .page");
+    if (include) b = b.include(include);
+    expect((await b.analyze()).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+  };
+  await page.goto("/");
+  await check();
+  await open(page, 3);
+  await check();
+  await page.locator("#btnMore").click();
+  await page.locator("#miExtract").click();
+  await check("dialog");
 });

@@ -99,7 +99,7 @@ $("#app").innerHTML = `
       <div id="outline" class="outline"></div>
     </div>
     <div id="notesPanel" class="panel" hidden><div id="notesList" class="notes-list" aria-live="polite"></div></div>
-    <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
+    <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="150" aria-valuemax="480" aria-valuenow="208" tabindex="0"></div>
   </aside>
   <main class="stage">
     <div id="viewerContainer" class="viewer-container" tabindex="0"><div id="viewer" class="pdfViewer"></div></div>
@@ -1648,6 +1648,7 @@ const setSidebarWidth = (w: number) => {
   const clamped = Math.round(Math.max(150, Math.min(w, Math.min(480, innerWidth * 0.5))));
   document.documentElement.style.setProperty("--sidebar-w", `${clamped}px`);
   localStorage.setItem("leaflark.sidebarWidth", String(clamped));
+  $("#sidebarResizer").setAttribute("aria-valuenow", String(clamped));
 };
 if (localStorage.getItem("leaflark.sidebarWidth")) setSidebarWidth(+localStorage.getItem("leaflark.sidebarWidth")!);
 {

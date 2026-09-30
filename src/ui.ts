@@ -71,8 +71,11 @@ export async function confirmDialog(o: { title: string; message: string; okLabel
 }
 
 export async function promptDialog(o: { title: string; message: string; value?: string; inputType?: string; okLabel?: string; validate?: (v: string) => string | null }): Promise<string | null> {
-  const input = el("input", { type: o.inputType ?? "text", value: o.value ?? "", className: "text-input", autocomplete: o.inputType === "password" ? "current-password" : "off" }) as HTMLInputElement;
-  const err = el("p", { className: "field-error", role: "alert" });
+  // Named after the dialog (“Extract pages”, “Password”…); errors are announced and tied to the field.
+  const errId = `err-${Math.random().toString(36).slice(2)}`;
+  const input = el("input", { type: o.inputType ?? "text", value: o.value ?? "", className: "text-input", autocomplete: o.inputType === "password" ? "current-password" : "off", ariaLabel: o.title }) as HTMLInputElement;
+  input.setAttribute("aria-describedby", errId);
+  const err = el("p", { className: "field-error", role: "alert", id: errId });
   const body = el("div", {}, [input, err]);
   const p = showDialog({ title: o.title, message: o.message, body, buttons: [{ label: "Cancel", value: false }, { label: o.okLabel ?? "OK", value: true, primary: true }] });
   const form = input.closest("form") as any;
