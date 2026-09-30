@@ -868,7 +868,7 @@ function renderToolOptions(toolId: string) {
     toolText: { colors: palette, size: ["Size", 6, 72, 14], hint: "Click anywhere on a page to add text." },
     toolDraw: { colors: palette, size: ["Thickness", 1, 20, 3], opacity: true, hint: "Drag on a page to draw." },
     toolSign: { colors: [], hint: "Click on a page to place your signature. Drag to move it, drag a corner to resize." },
-    toolNote: { colors: [], hint: "Click on a page to add a sticky note. Click a note to reply, change or delete it." },
+    toolNote: { colors: [], hint: "Click on a page (or press Enter) to add a sticky note. Click a note to reply, change or delete it." },
     toolEdit: { colors: [], hint: "Click any line of text to change it. Enter to apply, Esc to cancel." },
     toolRedact: { colors: [], hint: "Drag over anything you want to remove permanently — text underneath is deleted, not just covered." },
     toolImage: { colors: [], hint: "Choose an image, then drag it where you want. Click on a page to add another." },
@@ -1053,7 +1053,8 @@ async function noteDialog(o: { title: string; text: string; existing: boolean; r
     parts.push(reply);
   }
   parts.push(el("label", { className: "form-row" }, [el("span", { textContent: "Your name" }), name]));
-  setTimeout(() => (o.existing && o.replies?.length ? reply! : area).focus(), 0);
+  // Opening an existing note is usually to answer it; the note itself is one Shift+Tab away.
+  setTimeout(() => (reply ?? area).focus(), 0);
   const r = await showDialog<string>({
     title: o.title, body: el("div", { className: "stamp-form note-form" }, parts),
     buttons: [...(o.existing ? [{ label: "Delete note", value: "delete" }] : []), { label: "Cancel", value: "cancel" }, { label: o.existing ? "Save" : "Add note", value: "ok", primary: true }],
@@ -1068,18 +1069,42 @@ async function noteDialog(o: { title: string; text: string; existing: boolean; r
 container.addEventListener("click", (e) => {
   if (activeToolId === "toolNote" && (e.target as HTMLElement).closest?.(".textAnnotation")) e.stopPropagation();
 }, true);
-container.addEventListener("pointerdown", async (e) => {
+container.addEventListener("pointerdown", (e) => {
   if (activeToolId !== "toolNote" || e.button !== 0 || !doc) return;
   const pageEl = (e.target as HTMLElement).closest?.(".page") as HTMLElement | null;
   if (!pageEl) return;
   e.preventDefault();
   e.stopPropagation();
+  void noteAt(pageEl, e.target as HTMLElement, e.clientX, e.clientY);
+}, true);
+// Keyboard: Enter on a focused note opens it; Enter elsewhere in the viewer adds a note near the
+// top-left of the visible part of the current page.
+container.addEventListener("keydown", (e) => {
+  if (activeToolId !== "toolNote" || e.key !== "Enter" || e.ctrlKey || e.metaKey || e.altKey || !doc) return;
+  const t = e.target as HTMLElement;
+  if (t.closest(".textAnnotation")) {
+    e.preventDefault(); e.stopPropagation();
+    const pageEl = t.closest(".page") as HTMLElement;
+    const r = t.getBoundingClientRect();
+    void noteAt(pageEl, t, r.left + r.width / 2, r.top + r.height / 2);
+    return;
+  }
+  if (t !== container && !t.closest(".page")) return;
+  const pageEl = container.querySelector<HTMLElement>(`.page[data-page-number="${viewer.currentPageNumber}"]`);
+  if (!pageEl) return;
+  e.preventDefault(); e.stopPropagation();
+  const pr = pageEl.getBoundingClientRect(), cr = container.getBoundingClientRect();
+  const x = Math.max(pr.left, cr.left) + 40, y = Math.max(pr.top, cr.top) + 40;
+  void noteAt(pageEl, pageEl, Math.min(x, pr.right - 30), Math.min(y, pr.bottom - 30));
+}, true);
+async function noteAt(pageEl: HTMLElement, target: HTMLElement, clientX: number, clientY: number) {
+  if (!doc) return;
   const idx = +pageEl.dataset.pageNumber! - 1;
   const view = viewer.getPageView(idx);
   if (!view?.viewport) return;
   const notes = await import("./notes");
   const author = () => localStorage.getItem("leaflark.author") ?? "";
-  const existing = (e.target as HTMLElement).closest(".textAnnotation") as HTMLElement | null;
+  const existing = target.closest(".textAnnotation") as HTMLElement | null;
   const id = existing?.dataset.annotationId;
   if (id) {
     const { toEntry, thread } = await import("./notelist");
@@ -1103,11 +1128,11 @@ container.addEventListener("pointerdown", async (e) => {
     return;
   }
   const r = pageEl.getBoundingClientRect();
-  const pt = view.viewport.convertToPdfPoint(e.clientX - r.left - pageEl.clientLeft, e.clientY - r.top - pageEl.clientTop) as [number, number];
+  const pt = view.viewport.convertToPdfPoint(clientX - r.left - pageEl.clientLeft, clientY - r.top - pageEl.clientTop) as [number, number];
   const res = await noteDialog({ title: "Add note", text: "", existing: false });
   if (!res || "delete" in res || !res.text) return;
   mutatePages("Adding note", (b) => notes.addNote(b, idx, pt, res.text, { ...crypt(), author: author() }), idx + 1, true);
-}, true);
+}
 
 // ───────────────────────────── Redaction ─────────────────────────────
 const redact = setupRedact({
@@ -1579,7 +1604,7 @@ function showShortcuts() {
   const list: [string, string][] = [
     [`${mod}O`, "Open"], [`${mod}S`, "Save"], [`${isMac ? "⇧⌘S" : "Ctrl+Shift+S"}`, "Save as"], [`${mod}P`, "Print"],
     [`${mod}F`, "Find"], ["Enter / ⇧Enter", "Next / previous match"], [`${mod}+ / ${mod}−`, "Zoom in / out"], [`${mod}0`, "Fit width"],
-    [`${mod}Z / ${isMac ? "⇧⌘Z" : "Ctrl+Y"}`, "Undo / redo"], ["E, H, T, N, D, I, S, R", "Edit text, highlight, text, note, draw, image, sign, redact"], ["Esc", "Back to select tool"],
+    [`${mod}Z / ${isMac ? "⇧⌘Z" : "Ctrl+Y"}`, "Undo / redo"], ["E, H, T, N, D, I, S, R", "Edit text, highlight, text, note, draw, image, sign, redact"], ["Esc", "Back to select tool"], ["Enter (Note tool)", "Add a note, or open the focused note"], [`${mod}Enter`, "Save a note or reply"],
     ["← → / PgUp PgDn", "Previous / next page"], ["Home / End", "First / last page"], ["F4", "Toggle sidebar"], ["Del", "Delete selected pages (sidebar)"], ["Alt+↑ / Alt+↓", "Move selected pages (sidebar)"],
   ];
   const dl = el("dl", { className: "props keys" });

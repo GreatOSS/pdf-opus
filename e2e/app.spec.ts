@@ -299,3 +299,22 @@ test("notes tab lists notes and jumps to them", async ({ page }) => {
   await expect(page.locator(".popupAnnotation:visible").first()).toContainText("Listed note");
   await expect(page.locator(".popupAnnotation:visible .popup-replies")).toContainText("A reply");
 });
+
+test("notes can be added and answered with the keyboard only", async ({ page }) => {
+  await open(page, 2);
+  await page.locator("#viewerContainer").focus();
+  await page.keyboard.press("n");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Note" })).toBeFocused();
+  await page.keyboard.type("Keyboard note");
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await expect(page.locator(".textAnnotation")).toHaveCount(1);
+  await page.locator(".textAnnotation").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Reply" })).toBeFocused();
+  await page.keyboard.type("Keyboard reply");
+  await page.keyboard.press("ControlOrMeta+Enter");
+  await page.locator("#tabNotes").click();
+  await expect(page.locator(".note-item .note-body").first()).toHaveText("Keyboard note");
+  await expect(page.locator(".note-item .note-reply")).toContainText("Keyboard reply");
+});
