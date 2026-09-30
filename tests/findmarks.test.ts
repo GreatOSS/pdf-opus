@@ -14,7 +14,19 @@ describe("matchRects", () => {
     expect(rects[1][0]).toBeCloseTo(100 + 20 * 5 - 2);
   });
   it("skips rotated text and ignores empty queries", () => {
-    expect(matchRects([item("secret", 0, 0, 10, true)], "secret")).toEqual({ rects: [], skipped: 1 });
+    expect(matchRects([item("secret", 0, 0, 10, true)], "secret")).toEqual({ rects: [], skipped: 1, matches: 0 });
     expect(matchRects([item("secret")], "  ").rects).toHaveLength(0);
+  });
+  it("finds phrases split across items on the same line, but not across lines", () => {
+    // "John" + "Smith" as separate items with a word gap; "Sm" + "ith" kerned apart without a gap.
+    const items = [item("Name: John", 100), item("Smith", 160), item("Sm", 100, 400), item("ith", 110, 400), item("John", 100, 300), item("Smith", 100, 280)];
+    const { rects } = matchRects(items, "john  smith");
+    expect(rects).toHaveLength(2);
+    expect(matchRects(items, "john smith").matches).toBe(1); // one match, one rect per piece
+    expect(rects[0][0]).toBeCloseTo(100 + 6 * 5 - 2);
+    expect(rects[0][2]).toBeCloseTo(20 + 4);
+    expect(rects[1][0]).toBeCloseTo(160 - 2);
+    expect(matchRects(items, "smith").rects).toHaveLength(4); // the split one gives a rect per piece
+    expect(matchRects(items, "smith").rects.filter((r) => r[1] < 450 && r[1] > 350)).toHaveLength(2);
   });
 });

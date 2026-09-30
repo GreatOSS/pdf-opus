@@ -935,13 +935,13 @@ async function findAndMark() {
   if (query == null || doc?.pdf !== pdf) return;
   showLoading("Searching…");
   try {
-    const { marks, skipped } = await (await import("./findmarks")).findMarks(pdf, query.trim());
+    const { marks, skipped, matches } = await (await import("./findmarks")).findMarks(pdf, query.trim());
     if (doc?.pdf !== pdf) return;
     if (!marks.length) { toast(skipped ? `“${query.trim()}” only appears in rotated text, which can’t be marked automatically yet — mark it by hand.` : `No matches for “${query.trim()}”.`, skipped ? "error" : "info"); return; }
     redact.add(marks);
     const pages = new Set(marks.map((m) => m.pageIndex)).size;
     viewer.currentPageNumber = marks[0].pageIndex + 1;
-    toast(`Marked ${marks.length} match${marks.length === 1 ? "" : "es"} on ${pages} page${pages === 1 ? "" : "s"}. Check them, then apply.${skipped ? ` ${skipped} in rotated text weren’t marked.` : ""}`);
+    toast(`Marked ${matches} match${matches === 1 ? "" : "es"} on ${pages} page${pages === 1 ? "" : "s"}. Check them, then apply.${skipped ? ` ${skipped} in rotated text weren’t marked.` : ""}`);
   } finally { hideLoading(); }
 }
 

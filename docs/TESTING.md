@@ -182,6 +182,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Redact: inline images
 - Inline images (BI…EI in the content stream) under a mark were left in the file. Now any inline image a mark touches is removed whole (they're small by spec; counted in the "removed completely" toast); Edit text doesn't touch them. Hands-on: generated PDF with two inline 16×16 images + text → marked part of the big one in the app → toast “1 image … removed completely” → saved: pdfimages lists only the other inline image, pdftotext text intact, Poppler render shows black box + untouched second image. unit 42/42.
 
+### 2026-09-30 — Find & mark across text pieces
+- Find & mark only matched inside a single pdf.js text item, so a phrase the PDF splits (font change, separate space item, kerning) was missed, and the user could think every occurrence was marked. Items on the same baseline are now joined into lines (whitespace collapsed, a space inferred for word gaps); a match gets one mark per piece; the toast counts matches, not pieces. Hands-on: generated PDF “Account number:” + “ ” + bold “4417 1234” → “number: 4417”: 1 match (3 areas), applied + saved → pdftotext “Account ⎵ 1234 (primary)”; “4417 1234” on consecutive lines is (correctly) not matched. Regression: tracemonkey “trace” still 416 on 14 pages; W-9 “taxpayer identification number” 5 on 3 pages. unit 43/43.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
