@@ -13,8 +13,15 @@ describe("matchRects", () => {
     expect(h).toBeCloseTo(12);
     expect(rects[1][0]).toBeCloseTo(100 + 20 * 5 - 2);
   });
-  it("skips rotated text and ignores empty queries", () => {
-    expect(matchRects([item("secret", 0, 0, 10, true)], "secret")).toEqual({ rects: [], skipped: 1, matches: 0 });
+  it("matches rotated text in its reading direction, skips mirrored text, ignores empty queries", () => {
+    // Text running up the page (a sidebar): glyphs extend towards -x from the baseline.
+    const r = matchRects([item("secret", 0, 0, 10, true)], "secret");
+    expect(r.matches).toBe(1);
+    [-9.5, -2, 12, 34].forEach((v, k) => expect(r.rects[0][k]).toBeCloseTo(v));
+    // Upside down (180°) and a phrase split across two rotated items.
+    expect(matchRects([{ str: "top secret", width: 50, transform: [-10, 0, 0, -10, 300, 700] }], "secret").rects[0][0]).toBeCloseTo(300 - 50 - 2);
+    expect(matchRects([item("John", 50, 100, 10, true), item("Smith", 50, 130, 10, true)], "john smith").matches).toBe(1);
+    expect(matchRects([{ str: "secret", width: 30, transform: [-10, 0, 0, 10, 0, 0] }], "secret")).toEqual({ rects: [], skipped: 1, matches: 0 });
     expect(matchRects([item("secret")], "  ").rects).toHaveLength(0);
   });
   it("finds phrases split across items on the same line, but not across lines", () => {

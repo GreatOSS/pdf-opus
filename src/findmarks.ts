@@ -10,9 +10,42 @@ interface Item { str: string; transform: number[]; width: number; fontName?: str
  * several pieces (kerning, font changes, "John" + "Smith") is still found; runs of whitespace
  * match any whitespace. pdf.js gives no per-glyph positions, so a match's extent is estimated
  * from its share of the item's characters and padded a little: better to take a sliver of a
- * neighbour than to leave part of a matched glyph behind. Rotated/skewed items are skipped (counted).
+ * neighbour than to leave part of a matched glyph behind. Rotated text (sidebars, stamps, pages
+ * drawn sideways) is matched in its own reading direction; skewed or mirrored items are skipped (counted).
  */
-export function matchRects(items: Item[], query: string, measure: (text: string, item: Item) => number = (t) => t.length): { rects: [number, number, number, number][]; skipped: number; matches: number } {
+export function matchRects(items: Item[], query: string, measure: (text: string, item: Item) => number = (t) => t.length): { rects: Rect[]; skipped: number; matches: number } {
+  // Group items by text direction and express each group in its own frame, where the text is upright.
+  const groups = new Map<number, { u: [number, number]; items: Item[] }>();
+  const odd: Item[] = [];
+  for (const it of items) {
+    if (typeof it.str !== "string" || !it.str) continue;
+    const [a, b, c, d, x, y] = it.transform;
+    const sa = Math.hypot(a, b), sd = Math.hypot(c, d);
+    if (!sa || !sd || Math.abs(a * c + b * d) > 0.02 * sa * sd || a * d - b * c <= 0) { odd.push(it); continue; }
+    const angle = Math.round(Math.atan2(b, a) * 1000);
+    const u: [number, number] = [a / sa, b / sa];
+    const g = groups.get(angle) ?? { u, items: [] };
+    groups.set(angle, g);
+    g.items.push({ ...it, transform: [sd, 0, 0, sd, x * u[0] + y * u[1], -x * u[1] + y * u[0]] });
+  }
+  const out = matchUpright(odd, query, measure); // counts them as skipped
+  for (const { u, items: local } of groups.values()) {
+    const r = matchUpright(local, query, measure);
+    out.matches += r.matches;
+    out.skipped += r.skipped;
+    for (const [x, y, w, h] of r.rects) {
+      // Back to page space (local x runs along u, local y along its normal); keep the bounding box.
+      const pts = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([lx, ly]) => [lx * u[0] - ly * u[1], lx * u[1] + ly * u[0]]);
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+      out.rects.push([Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]);
+    }
+  }
+  return out;
+}
+
+type Rect = [number, number, number, number];
+
+function matchUpright(items: Item[], query: string, measure: (text: string, item: Item) => number): { rects: Rect[]; skipped: number; matches: number } {
   const q = query.trim().toLowerCase().replace(/\s+/g, " ");
   const rects: [number, number, number, number][] = [];
   let skipped = 0, matches = 0;

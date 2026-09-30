@@ -200,6 +200,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Accessible names for form fields
 - Fields without a /TU tooltip now get an aria-label from the printed label (checkboxes: text to the right; text fields: text just before on the same line, else the label paragraph above, else further left). Checked the labels exposed on W-9 and 1040 p1: W-9 “1 Name of entity/individual. An entry is required…”, “2 Business name/…”, all 3a checkboxes (“C corporation”, “Partnership”…), “Exempt payee code (if any)”, “6 City, state, and ZIP code”, “Employer identification number”; 1040 “…other tax year beginning”, “, 2025, ending”, “Your first name and middle initial”, “Last name”, “Home address …”. Imperfect: W-9 LLC classification box → “Trust/estate”, first SSN digit box → nearby paragraph, 1040 date comb boxes → “Deceased MM / DD /…”. Fields with /TU keep pdf.js's label. unit 49/49.
 
+### 2026-09-30 — Find & mark: rotated text
+- Rotated text was skipped. Items are now grouped by text direction and matched in their own frame (so phrases split across rotated items are found too), then mapped back to page space; only slanted/mirrored text is still skipped (toast says so). Hands-on: W-9 “specific instructions” — the vertical sidebar on pages 1 and 2 → “Marked 2 matches on 2 pages”, vertical marks sit on the words → applied, saved → pdftotext: 0 (was 2), neighbours “Print or type.”, “on page 3.” intact. Unit: 90°, 180°, split rotated phrase, mirrored skipped. unit 49/49.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
