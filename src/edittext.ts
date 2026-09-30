@@ -137,7 +137,7 @@ export function setupEditText(ctx: Ctx) {
     const seq = ++hoverSeq;
     const hit = await locate(e);
     if (seq !== hoverSeq) return;
-    if (!hit || hit.view.viewport.rotation) { hover.remove(); return; }
+    if (!hit) { hover.remove(); return; }
     const r = cssRectOf(hit.view, hit.run);
     Object.assign(hover.style, { left: `${r.left - 2}px`, top: `${r.top - 1}px`, width: `${r.width + 4}px`, height: `${r.height + 2}px` });
     if (hover.parentElement !== hit.pageEl) hit.pageEl.append(hover);
@@ -150,7 +150,6 @@ export function setupEditText(ctx: Ctx) {
     if (editing) { (editing as any)._finish(true); return; }
     const hit = await locate(e);
     if (!hit) return;
-    if (hit.view.viewport.rotation) { ctx.notify("Editing text on rotated pages isn’t supported yet.", "error"); return; }
     open(hit);
   }, true);
 
@@ -175,14 +174,22 @@ export function setupEditText(ctx: Ctx) {
     box.spellcheck = true;
     box.textContent = run.str;
     const rgbCss = (c: number[]) => `rgb(${c.map((v) => Math.round(v * 255)).join(",")})`;
+    // Lay the box out in the text's own frame and turn it with the page: its top-left corner is the
+    // run's top-left in PDF space; on rotated pages that corner lands elsewhere on screen.
+    const vp = view.viewport;
+    const [ox, oy] = vp.convertToViewportPoint(run.x, run.y + run.size * 0.95);
+    const [ux, uy] = vp.convertToViewportPoint(run.x + 1, run.y + run.size * 0.95);
+    const k = Math.hypot(ux - ox, uy - oy); // CSS px per PDF unit
+    const w = run.width * k, h = run.size * 1.2 * k;
     Object.assign(box.style, {
-      left: `${r.left}px`, top: `${r.top}px`, minWidth: `${r.width}px`, height: `${r.height}px`, lineHeight: `${r.height}px`,
+      left: `${ox}px`, top: `${oy}px`, minWidth: `${w}px`, height: `${h}px`, lineHeight: `${h}px`,
+      transformOrigin: "0 0", transform: vp.rotation ? `rotate(${vp.rotation}deg)` : "",
       fontFamily: family === "serif" ? "Times New Roman, Times, serif" : family === "mono" ? "Courier New, Courier, monospace" : "Helvetica, Arial, sans-serif",
       fontWeight: bold ? "700" : "400", fontStyle: italic ? "italic" : "normal",
       color: rgbCss(colors.fg), background: rgbCss(colors.bg),
     });
     // Match the rendered size: the box height is 1.2 × the font size in CSS px.
-    box.style.fontSize = `${run.size * (r.height / (run.size * 1.2))}px`;
+    box.style.fontSize = `${run.size * k}px`;
     pageEl.append(box);
     editing = box;
     box.focus();

@@ -269,7 +269,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Notes on phones; replies in the popup
 - Production build, Pixel 7 (Chromium) and iPhone 14 (WebKit) touch emulation: tap Note tool → tap page → dialog → “Phone note” added; tap note → reply → Notes tab shows note + reply; no page errors. Found: outside the Note tool the pdf.js popup showed only the note, not its replies → replies are now appended under the note in the popup (added when pdf.js first builds it). Verified with last run's saved thread file: popup “Ana … Keep me / Ana · … reply to keep”. e2e 51/51 (asserts the reply in the popup), unit 63/63.
 
+### 2026-09-30 — Edit text on rotated pages
+- Edit text used to refuse rotated pages. The edit box is now laid out in the text's own frame and turned with the page (CSS rotate about the run's top-left); the replacement is written in PDF user space, so /Rotate is untouched. tracemonkey p1 rotated 90°: box exactly over the vertical “Abstract” (±1 px), typed “Summary Ünï” → rendered rotated in bold Times, textLayer no longer has “Abstract”; saved: page rot 90, pdftotext “Summary Ünï”. Box alignment also checked at 180° (upside-down) and 270°. Note: the browser MCP connection dropped twice during long scripts this session; the same flows in standalone Playwright had no crashes or page errors. New e2e (3 engines) 54/54, unit 63/63.
+
 ### Known gaps / next
-- Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
+- Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; text drawn rotated within the page (not via page rotation) isn't editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
 - Inferred form-field labels are heuristic; small boxes inside dense rows can pick up a neighbour's label.

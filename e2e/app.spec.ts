@@ -113,6 +113,30 @@ test("edits existing text in place", async ({ page }) => {
   await expect(page).toHaveTitle(/^• /);
 });
 
+test("edits text on a rotated page", async ({ page }) => {
+  await open(page, 1);
+  await page.locator("#thumbs [role=option]").first().click();
+  await page.locator("#pgRotR").click();
+  await expect.poll(() => page.evaluate(async () => (await (window as any).leaflark.doc.pdf.getPage(1)).rotate)).toBe(90);
+  await page.keyboard.press("e");
+  const span = page.locator(".page .textLayer span", { hasText: "Hello Leaflark" }).first();
+  const b = (await span.boundingBox())!;
+  await page.mouse.click(b.x + b.width / 2, b.y + 10);
+  const box = page.locator(".edit-box");
+  await expect(box).toHaveText("Hello Leaflark page 1");
+  const eb = (await box.boundingBox())!;
+  // The box covers the (vertical) line of text.
+  expect(Math.abs(eb.x + eb.width / 2 - (b.x + b.width / 2))).toBeLessThan(6);
+  expect(eb.height).toBeGreaterThan(eb.width);
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("Turned text");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(async () => {
+    const p = await (window as any).leaflark.doc.pdf.getPage(1);
+    return (await p.getTextContent()).items.map((i: any) => i.str).join(" ");
+  })).toContain("Turned text");
+});
+
 test("redacts text for real", async ({ page }) => {
   await open(page, 1);
   await page.locator("#toolRedact").click();
