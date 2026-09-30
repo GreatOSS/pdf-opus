@@ -273,4 +273,5 @@ test("notes tab lists notes and jumps to them", async ({ page }) => {
   await page.keyboard.press("Escape");
   await page.locator(".note-item").click();
   await expect(page.locator(".popupAnnotation:visible").first()).toContainText("Listed note");
+  await expect(page.locator(".popupAnnotation:visible .popup-replies")).toContainText("A reply");
 });

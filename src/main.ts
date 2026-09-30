@@ -760,9 +760,29 @@ eventBus.on("annotationlayerrendered", async ({ source }: any) => {
   // Replies sit on the same spot as the note they answer; show one icon per thread (the replies are
   // listed in the note dialog and the Notes tab).
   if ((source.div as HTMLElement).querySelector(".textAnnotation")) {
-    for (const a of (await source.pdfPage.getAnnotations()) as any[]) {
-      if (!a.inReplyTo || a.replyType === "Group") continue;
+    const annots = (await source.pdfPage.getAnnotations()) as any[];
+    const replies = annots.filter((a) => a.inReplyTo && a.replyType !== "Group");
+    for (const a of replies) {
       source.div.querySelectorAll(`[data-annotation-id="${CSS.escape(a.id)}"], [data-annotation-id="popup_${CSS.escape(a.id)}"]`).forEach((n: HTMLElement) => { n.hidden = true; n.style.display = "none"; });
+    }
+    if (replies.length) {
+      const { toEntry, thread } = await import("./notelist");
+      const when = new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" });
+      for (const note of thread(annots.map((a) => toEntry(a, 0)).filter((x) => x) as any)) {
+        const section = source.div.querySelector(`[data-annotation-id="popup_${CSS.escape(note.id)}"]`) as HTMLElement | null;
+        if (!note.replies.length || !section) continue;
+        // pdf.js builds the popup when it's first shown; add the replies below the note then.
+        const addReplies = () => {
+          const popup = section.querySelector(".popup");
+          if (!popup || popup.querySelector(".popup-replies")) return !!popup;
+          popup.append(el("div", { className: "popup-replies" }, note.replies.map((r) => el("div", { className: "popup-reply" }, [
+            el("span", { className: "popup-reply-meta", textContent: [r.author || "Reply", r.date ? when.format(r.date) : ""].filter(Boolean).join(" · ") }),
+            el("span", { textContent: r.text }),
+          ]))));
+          return true;
+        };
+        if (!addReplies()) { const mo = new MutationObserver(() => { if (addReplies()) mo.disconnect(); }); mo.observe(section, { childList: true, subtree: true }); }
+      }
     }
   }
   const controls = [...(source.div as HTMLElement).querySelectorAll<HTMLElement>(".annotationLayer :is(input, textarea, select)[data-element-id]")]

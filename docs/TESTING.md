@@ -266,6 +266,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Replies to notes
 - Clicking a note with the Note tool now shows its thread and a “Write a reply…” box; replies are /Text annotations with /IRT → note, /RT /R (Acrobat's model), stacked on the note. The viewer shows one icon per thread (pdf.js drew each reply as its own icon on the same spot); the Notes tab nests replies under their note, oldest first. Deleting a note asks first when it has replies and removes the whole thread (incl. replies to replies, popups). tracemonkey as “Ana”/“Bo”: note → reply by Bo → dialog and Notes tab show “Bo · … Yes, approved.”; two notes with replies → delete one → confirm “Its reply will be deleted too.” → saved file: note 997 + reply 1000 (IRT 997 0 R), nothing else. Found: pdf.js also opened its popup behind our dialog when a note was clicked with the tool → suppressed; note box now compact when a thread is shown. e2e 51/51, unit 63/63.
 
+### 2026-09-30 — Notes on phones; replies in the popup
+- Production build, Pixel 7 (Chromium) and iPhone 14 (WebKit) touch emulation: tap Note tool → tap page → dialog → “Phone note” added; tap note → reply → Notes tab shows note + reply; no page errors. Found: outside the Note tool the pdf.js popup showed only the note, not its replies → replies are now appended under the note in the popup (added when pdf.js first builds it). Verified with last run's saved thread file: popup “Ana … Keep me / Ana · … reply to keep”. e2e 51/51 (asserts the reply in the popup), unit 63/63.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

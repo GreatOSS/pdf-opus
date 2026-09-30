@@ -313,3 +313,6 @@ body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }
 .note-thread .note-body { -webkit-line-clamp: unset; display: block; }
 .note-text.reply { min-height: 4em; }
 .note-text.compact { min-height: 4.5em; }
+.annotationLayer .popup-replies { margin-top: 6px; border-top: 1px solid rgba(0, 0, 0, .2); padding-top: 4px; display: flex; flex-direction: column; gap: 4px; }
+.annotationLayer .popup-reply { display: flex; flex-direction: column; white-space: pre-wrap; }
+.annotationLayer .popup-reply-meta { font-weight: 600; font-size: .9em; }
