@@ -86,6 +86,16 @@ describe("fixFreeTextAppearances: form fields", () => {
       expect(await state(out)).toEqual({ ap: true, need: false });
     }
   });
+  it("uses the bold fallback when the field's font is bold", async () => {
+    const fonts = (bold?: boolean) => async () => new Uint8Array(readFileSync(new URL(`../public/fonts/DejaVuSans${bold ? "-Bold" : ""}.ttf`, import.meta.url)));
+    const src = await withField("Łukasz");
+    const d = await PDFDocument.load(src);
+    const w = d.getPage(0).node.Annots()!.lookup(0, PDFDict);
+    w.set(PDFName.of("DA"), PDFString.of("/HelveticaLTStd-Bold 8.00 Tf 0 0 0.5 rg"));
+    const out = await fixFreeTextAppearances(await d.save(), { unicodeFont: (bold) => fonts(bold)() });
+    const names = [...(await PDFDocument.load(out)).context.enumerateIndirectObjects()].map(([, o]) => String((o as any).get?.(PDFName.of("BaseFont")) ?? "")).filter(Boolean);
+    expect(names.some((n) => /DejaVuSans-Bold/.test(n))).toBe(true);
+  });
   it("leaves plain fields for the viewer to draw", async () => {
     const src = await withField("plain");
     expect(await fixFreeTextAppearances(src, { unicodeFont: async () => font() })).toBe(src);

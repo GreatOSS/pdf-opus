@@ -112,9 +112,10 @@ const FONT_FOR: Record<string, StandardFonts> = {
 };
 
 /** Replace text visually: cover the old run with its background colour and draw the new text on top. */
-export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { password = "", unicodeFont }: CryptOptions & { unicodeFont?: () => Promise<Uint8Array> } = {}): Promise<Uint8Array> {
+export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { password = "", unicodeFont }: CryptOptions & { unicodeFont?: UnicodeFont } = {}): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
   const fonts = new Map<string, PDFFont>();
+  const uniFonts = new Map<boolean, PDFFont>();
   let uni: PDFFont | undefined;
 
   for (const e of edits) {
@@ -124,11 +125,8 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
     let font = fonts.get(key)!;
     // Characters outside the standard fonts: embed a subset of the Unicode fallback font instead.
     if (unicodeFont && unsupportedChars(e.text).length) {
-      if (!uni) {
-        const fontkit: any = await import("@cantoo/fontkit");
-        doc.registerFontkit(fontkit.default ?? fontkit);
-        uni = await doc.embedFont(await unicodeFont(), { subset: true });
-      }
+      uni = uniFonts.get(e.bold) ?? (await embedUnicode(doc, unicodeFont, e.bold));
+      uniFonts.set(e.bold, uni);
       font = uni;
     }
     const [rx, ry, rw, rh] = e.rect;
@@ -153,9 +151,10 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
  * pdf.js saves text boxes (FreeText) and text form fields whose text the standard fonts can't
  * encode without an appearance, so many viewers show them blank. Draw one with the Unicode font.
  */
-export async function fixFreeTextAppearances(bytes: Uint8Array, { password = "", unicodeFont }: CryptOptions & { unicodeFont: () => Promise<Uint8Array> }): Promise<Uint8Array> {
+export async function fixFreeTextAppearances(bytes: Uint8Array, { password = "", unicodeFont }: CryptOptions & { unicodeFont: UnicodeFont }): Promise<Uint8Array> {
   const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
   let font: PDFFont | undefined;
+  const fieldFonts = new Map<boolean, PDFFont>();
   let changed = false, blankFields = false;
   const acroForm = doc.catalog.lookupMaybe(PDFName.of("AcroForm"), PDFDict);
   // Field attributes can be inherited from parent fields (and DA from the AcroForm).
@@ -179,8 +178,11 @@ export async function fixFreeTextAppearances(bytes: Uint8Array, { password = "",
         if (inherited(annot, "FT")?.toString() !== "/Tx") continue;
         const value = textOf(inherited(annot, "V"));
         if (!needsFont(value)) { if (value) blankFields = true; continue; }
-        font ??= await embedUnicode(doc, unicodeFont);
-        annot.set(PDFName.of("AP"), doc.context.obj({ N: doc.context.register(fieldAppearance(doc, font, annot, value, inherited)) }));
+        // Match the field's weight: DA names the font, e.g. "/HelveticaLTStd-Bold 8 Tf".
+        const bold = /\/\S*(bold|black|heavy|bd\b)/i.test(String(inherited(annot, "DA") ?? ""));
+        const ff = fieldFonts.get(bold) ?? (await embedUnicode(doc, unicodeFont, bold));
+        fieldFonts.set(bold, ff);
+        annot.set(PDFName.of("AP"), doc.context.obj({ N: doc.context.register(fieldAppearance(doc, ff, annot, value, inherited)) }));
         changed = true;
         continue;
       }
@@ -219,10 +221,13 @@ export async function fixFreeTextAppearances(bytes: Uint8Array, { password = "",
   return doc.save();
 }
 
-async function embedUnicode(doc: PDFDocument, unicodeFont: () => Promise<Uint8Array>) {
+/** Loads the Unicode fallback font (DejaVu Sans), regular or bold. */
+export type UnicodeFont = (bold?: boolean) => Promise<Uint8Array>;
+
+async function embedUnicode(doc: PDFDocument, unicodeFont: UnicodeFont, bold = false) {
   const fontkit: any = await import("@cantoo/fontkit");
   doc.registerFontkit(fontkit.default ?? fontkit);
-  return doc.embedFont(await unicodeFont(), { subset: true });
+  return doc.embedFont(await unicodeFont(bold), { subset: true });
 }
 
 /** Appearance for a text field: size/colour from DA (0 = auto), alignment from Q, wrapping if multiline. */

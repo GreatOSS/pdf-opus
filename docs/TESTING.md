@@ -206,6 +206,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Firefox: organize pages
 - Firefox (Playwright), tracemonkey 14 pp: thumbnail 2 → Rotate right; thumbnail 3 → Delete key (undoable, no prompt); drag thumbnail 1 onto thumbnail 4 (orig p5); Ctrl+S. App: “of 13”, moved page selected and shown. Saved file: 13 pages; p1 = orig p2 with /Rotate 90; orig p3 gone; order orig 2, 4, 1, 5, … (drop inserts before the target). No console errors. No changes needed.
 
+### 2026-09-30 — Bold Unicode fallback
+- Added DejaVu Sans Bold: used for bold Edit-text runs and for form fields whose DA font is bold (e.g. /HelveticaLTStd-Bold). First try never matched: the DA PDF string stringifies with its parentheses, so the “starts with /” pattern failed — caught by the new unit test. 1040: “Zoë Łukasz” saved → pdffonts DejaVuSans-Bold subset, Poppler render matches the weight of the neighbouring bold “Müller-Wójcik”. Both DejaVu files (~1.5 MB) left out of the service-worker precache (cached on first use), so first visits download less. Edit-text bold path not exercised hands-on yet. unit 50/50.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
