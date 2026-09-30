@@ -126,6 +126,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miSaveAs">Save as…</button>
   <button role="menuitem" id="miPrint">Print…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
+  <button role="menuitem" id="miCrop">Crop pages…</button>
   <button role="menuitem" id="miStamp">Page numbers, headers & watermark…</button>
   <button role="menuitem" id="miCompress">Reduce file size…</button>
   <button role="menuitem" id="miOcr">Recognize text (OCR)…</button>
@@ -536,6 +537,81 @@ async function extractDialog() {
     toast(`Extracted ${idx.length} page${idx.length === 1 ? "" : "s"}`);
   } catch (e: any) { toast(e.message, "error"); }
 }
+async function cropDialog() {
+  if (!doc) return;
+  const pdf = doc.pdf, n = pdf.numPages;
+  const sel = thumbs.selected();
+  const saved = JSON.parse(localStorage.getItem("leaflark.crop") || "{}");
+  const auto = el("input", { type: "radio", name: "cropMode", checked: saved.mode !== "custom" }) as HTMLInputElement;
+  const custom = el("input", { type: "radio", name: "cropMode", checked: saved.mode === "custom" }) as HTMLInputElement;
+  const mm = (label: string, key: string) => {
+    const i = el("input", { type: "number", min: "0", step: "1", value: String(saved[key] ?? 10), className: "text-input", ariaLabel: `${label} margin in millimetres` }) as HTMLInputElement;
+    return { i, row: el("label", { className: "form-row" }, [el("span", { textContent: label }), i]) };
+  };
+  const m = { top: mm("Top", "top"), right: mm("Right", "right"), bottom: mm("Bottom", "bottom"), left: mm("Left", "left") };
+  const margins = el("div", { className: "crop-margins" }, [m.top.row, m.right.row, m.bottom.row, m.left.row, el("p", { className: "hint-text", textContent: "Millimetres cut from each edge, as the page is shown." })]);
+  const scopeSel = sel.length > 0 && sel.length < n;
+  const scope = el("select", { className: "text-input" }, [
+    el("option", { value: "all", textContent: `All ${n} pages` }),
+    ...(scopeSel ? [el("option", { value: "sel", textContent: `Selected pages (${compressRanges(sel)})` })] : []),
+  ]) as HTMLSelectElement;
+  if (scopeSel) scope.value = "sel";
+  const sync = () => { margins.hidden = !custom.checked; };
+  auto.onchange = custom.onchange = sync;
+  sync();
+  const body = el("div", { className: "stamp-form" }, [
+    el("label", { className: "chk-lg" }, [auto, "Trim white margins automatically"]),
+    el("label", { className: "chk-lg" }, [custom, "Custom margins"]),
+    margins,
+    el("label", { className: "form-row" }, [el("span", { textContent: "Pages" }), scope]),
+    el("p", { className: "hint-text", textContent: "Hides what's outside the crop in every viewer and when printing; the content itself is kept. You can undo this." }),
+  ]);
+  const ok = await showDialog({ title: "Crop pages", body, buttons: [{ label: "Cancel", value: false }, { label: "Crop", value: true, primary: true }] });
+  if (!ok || !doc || doc.pdf !== pdf) return;
+  const vals = Object.fromEntries(Object.entries(m).map(([k, x]) => [k, Math.max(0, +x.i.value || 0)])) as Record<"top" | "right" | "bottom" | "left", number>;
+  localStorage.setItem("leaflark.crop", JSON.stringify({ mode: custom.checked ? "custom" : "auto", ...vals }));
+  const indices = scope.value === "sel" ? sel : [...Array(n).keys()];
+  showLoading("Cropping…");
+  const boxes = new Map<number, [number, number, number, number]>();
+  let blank = 0, tooBig = 0;
+  try {
+    const { contentBox, setCropBoxes } = await import("./crop");
+    for (const i of indices) {
+      const page = await pdf.getPage(i + 1);
+      let rect: number[]; // [x0, y0, x1, y1] in viewport units (y down)
+      let vp;
+      if (custom.checked) {
+        vp = page.getViewport({ scale: 1 });
+        const pt = 72 / 25.4;
+        rect = [vals.left * pt, vals.top * pt, vp.width - vals.right * pt, vp.height - vals.bottom * pt];
+        if (rect[2] - rect[0] < 36 || rect[3] - rect[1] < 36) { tooBig++; continue; }
+      } else {
+        vp = page.getViewport({ scale: 0.75 });
+        const c = document.createElement("canvas");
+        c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+        const ctx = c.getContext("2d", { willReadFrequently: true })!;
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvas: c, canvasContext: ctx, viewport: vp } as any).promise;
+        const cb = contentBox(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+        c.width = c.height = 0;
+        if (!cb) { blank++; continue; }
+        const pad = 9 * 0.75; // ~9 pt of breathing room
+        rect = [Math.max(0, cb[0] - pad), Math.max(0, cb[1] - pad), Math.min(vp.width, cb[2] + pad), Math.min(vp.height, cb[3] + pad)];
+      }
+      const [ax, ay] = vp.convertToPdfPoint(rect[0], rect[1]);
+      const [bx, by] = vp.convertToPdfPoint(rect[2], rect[3]);
+      boxes.set(i, [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)]);
+    }
+    hideLoading();
+    if (!boxes.size) { toast(tooBig ? "Those margins would leave nothing of the page." : "Nothing to crop — the pages are blank.", "error"); return; }
+    const done = await mutatePages("Cropping", (b) => setCropBoxes(b, boxes, crypt()), viewer.currentPageNumber);
+    if (done) toast(`Cropped ${boxes.size} page${boxes.size === 1 ? "" : "s"}.${blank ? ` ${blank} blank page${blank === 1 ? " was" : "s were"} left as is.` : ""}${tooBig ? ` ${tooBig} page${tooBig === 1 ? " was" : "s were"} too small for those margins.` : ""}`);
+  } catch (e: any) {
+    hideLoading();
+    toast(`Couldn’t crop: ${e?.message ?? e}`, "error");
+  }
+}
+
 async function stampDialog() {
   if (!doc) return;
   const saved = JSON.parse(localStorage.getItem("leaflark.stamp") || "{}");
@@ -1365,6 +1441,7 @@ on("#miTheme", toggleTheme);
 on("#miDarkPages", () => applyDarkPages(!document.body.classList.contains("dark-pages")));
 on("#miOpen", pickAndOpen);
 on("#miSaveAs", () => save(true));
+on("#miCrop", cropDialog);
 on("#miPresent", startPresentation);
 on("#miPrint", print);
 on("#miExtract", extractDialog);

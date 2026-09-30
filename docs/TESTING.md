@@ -236,6 +236,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Dark pages (night reading)
 - More → “Dark pages”: pages shown light-on-dark (CSS invert + hue-rotate on the page element, so text, figures, form fields and marks stay consistent); display only — saving and printing unaffected. tracemonkey p2 in dark mode: text and the Figure 2 diagram legible, colours recognisable. Setting survives reload; menu then reads “Normal pages”. New e2e (3 desktop engines).
 
+### 2026-09-30 — Crop pages
+- More → “Crop pages…”: trim white margins automatically (render at 0.75×, find non-white bounds, 9 pt padding) or custom margins in mm (as displayed; rotation-aware via the viewport), all or selected pages; sets CropBox (drops stale Trim/ArtBox); undoable. tracemonkey auto, all 14 pages: ~1.2 s, “Cropped 14 pages.”, pdfinfo p1 CropBox 44,58–566,724, render tight with text intact; Ctrl+Z restores full page; thumbnail 1 selected → dialog defaults to “Selected pages (1)” → custom 20 mm → p1 CropBox 56.69 pt in, p2 untouched. Dialog: margin fields hidden unless Custom is chosen (first version showed them greyed out). unit 55/55.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
