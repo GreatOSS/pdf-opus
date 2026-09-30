@@ -123,7 +123,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miSaveAs">Save as…</button>
   <button role="menuitem" id="miPrint">Print…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
-  <button role="menuitem" id="miStamp">Page numbers & watermark…</button>
+  <button role="menuitem" id="miStamp">Page numbers, headers & watermark…</button>
   <button role="menuitem" id="miCompress">Reduce file size…</button>
   <button role="menuitem" id="miOcr">Recognize text (OCR)…</button>
   <button role="menuitem" id="miMerge">Append PDFs or images…</button>
@@ -545,30 +545,36 @@ async function stampDialog() {
     return sel;
   };
   const numOn = el("input", { type: "checkbox", checked: saved.numOn ?? true }) as HTMLInputElement;
-  const pos = select([["bottom-center", "Bottom centre"], ["bottom-right", "Bottom right"], ["bottom-left", "Bottom left"], ["top-center", "Top centre"], ["top-right", "Top right"]], saved.pos ?? "bottom-center");
-  const fmt = select([["n", "1"], ["page-n", "Page 1"], ["page-n-of-total", "Page 1 of N"], ["n-slash-total", "1 / N"]], saved.fmt ?? "n");
+  const pos = select([["bottom-center", "Bottom centre"], ["bottom-right", "Bottom right"], ["bottom-left", "Bottom left"], ["top-center", "Top centre"], ["top-right", "Top right"], ["top-left", "Top left"]], saved.pos ?? "bottom-center");
+  const fmt = select([["n", "1"], ["page-n", "Page 1"], ["page-n-of-total", "Page 1 of N"], ["n-slash-total", "1 / N"], ["custom", "Custom text…"]], saved.fmt ?? "n");
+  // Headers/footers and Bates numbers: {n} page number, {n:6} zero-padded, {total} page count.
+  const template = el("input", { className: "text-input", value: saved.template ?? "Page {n} of {total}", maxLength: 120, ariaLabel: "Custom text" }) as HTMLInputElement;
+  const templateHint = el("p", { className: "hint-text", textContent: "{n} page number · {n:6} padded, e.g. ACME-{n:6} → ACME-000001 · {total} page count" });
+  const templateRow = el("div", {}, [field("Text", template), templateHint]);
   const start = el("input", { type: "number", min: "1", value: String(saved.start ?? 1), className: "text-input" }) as HTMLInputElement;
   const skipFirst = el("input", { type: "checkbox", checked: !!saved.skipFirst }) as HTMLInputElement;
   const wmOn = el("input", { type: "checkbox", checked: !!saved.wmOn }) as HTMLInputElement;
   const wmText = el("input", { className: "text-input", value: saved.wmText ?? "CONFIDENTIAL", maxLength: 60 }) as HTMLInputElement;
   const wmOpacity = el("input", { type: "range", min: "0.05", max: "0.6", step: "0.05", value: String(saved.wmOpacity ?? 0.15) }) as HTMLInputElement;
-  const numBox = el("fieldset", { className: "form-group" }, [el("legend", {}, [el("label", { className: "chk-lg" }, [numOn, "Page numbers"])]), field("Position", pos), field("Format", fmt), field("Start at", start), el("label", { className: "chk-lg" }, [skipFirst, "Skip first page (cover)"])]);
+  const numBox = el("fieldset", { className: "form-group" }, [el("legend", {}, [el("label", { className: "chk-lg" }, [numOn, "Page numbers"])]), field("Position", pos), field("Format", fmt), templateRow, field("Start at", start), el("label", { className: "chk-lg" }, [skipFirst, "Skip first page (cover)"])]);
   const wmBox = el("fieldset", { className: "form-group" }, [el("legend", {}, [el("label", { className: "chk-lg" }, [wmOn, "Watermark"])]), field("Text", wmText), field("Opacity", wmOpacity)]);
   const sync = () => {
     numBox.querySelectorAll<HTMLInputElement | HTMLSelectElement>("select, input:not([type=checkbox]), .form-group > label input").forEach((i) => (i.disabled = !numOn.checked));
     [wmText, wmOpacity].forEach((i) => (i.disabled = !wmOn.checked));
+    templateRow.hidden = fmt.value !== "custom";
   };
-  numOn.onchange = wmOn.onchange = sync;
+  numOn.onchange = wmOn.onchange = fmt.onchange = sync;
   sync();
   const body = el("div", { className: "stamp-form" }, [numBox, wmBox, el("p", { className: "hint-text", textContent: "Added to every page’s content, so all viewers and printers show it. You can undo this." })]);
-  const ok = await showDialog({ title: "Page numbers & watermark", body, buttons: [{ label: "Cancel", value: false }, { label: "Apply", value: true, primary: true }] });
+  const ok = await showDialog({ title: "Page numbers, headers & watermark", body, buttons: [{ label: "Cancel", value: false }, { label: "Apply", value: true, primary: true }] });
   if (!ok || !doc || (!numOn.checked && !(wmOn.checked && wmText.value.trim()))) return;
-  const opts = { numOn: numOn.checked, pos: pos.value, fmt: fmt.value, start: Math.max(1, parseInt(start.value, 10) || 1), skipFirst: skipFirst.checked, wmOn: wmOn.checked, wmText: wmText.value, wmOpacity: +wmOpacity.value };
+  const opts = { numOn: numOn.checked, pos: pos.value, fmt: fmt.value, template: template.value, start: Math.max(1, parseInt(start.value, 10) || 1), skipFirst: skipFirst.checked, wmOn: wmOn.checked, wmText: wmText.value, wmOpacity: +wmOpacity.value };
   localStorage.setItem("leaflark.stamp", JSON.stringify(opts));
   const { stampPages } = await import("./stamp");
   mutatePages(opts.numOn && opts.wmOn ? "Adding page numbers and watermark" : opts.numOn ? "Adding page numbers" : "Adding watermark", (b) => stampPages(b, {
     ...crypt(),
-    numbers: opts.numOn ? { position: opts.pos as any, format: opts.fmt as any, start: opts.start, skipFirst: opts.skipFirst } : undefined,
+    numbers: opts.numOn ? { position: opts.pos as any, format: opts.fmt as any, start: opts.start, skipFirst: opts.skipFirst, template: opts.template } : undefined,
+    unicodeFont: unicodeFontBytes,
     watermark: opts.wmOn ? { text: opts.wmText, opacity: opts.wmOpacity } : undefined,
   }));
 }

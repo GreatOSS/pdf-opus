@@ -4,16 +4,23 @@ import type { CryptOptions } from "./organize";
 import { removeTextFromPage } from "./redact";
 import { unsupportedChars } from "./winansi";
 
-export type NumberPosition = "bottom-center" | "bottom-right" | "bottom-left" | "top-center" | "top-right";
-export type NumberFormat = "n" | "page-n" | "page-n-of-total" | "n-slash-total";
+export type NumberPosition = "bottom-center" | "bottom-right" | "bottom-left" | "top-center" | "top-right" | "top-left";
+export type NumberFormat = "n" | "page-n" | "page-n-of-total" | "n-slash-total" | "custom";
 
 export interface StampOptions extends CryptOptions {
-  numbers?: { position: NumberPosition; format: NumberFormat; start: number; size?: number; skipFirst?: boolean };
+  /** `template` is used with the "custom" format: {n} page number, {n:6} zero-padded (Bates), {total} page count. */
+  numbers?: { position: NumberPosition; format: NumberFormat; start: number; size?: number; skipFirst?: boolean; template?: string };
   watermark?: { text: string; opacity: number; color?: [number, number, number] };
+  /** Fallback font for text the standard fonts can't encode. */
+  unicodeFont?: UnicodeFont;
 }
 
-export const formatNumber = (fmt: NumberFormat, n: number, total: number) =>
-  fmt === "n" ? `${n}` : fmt === "page-n" ? `Page ${n}` : fmt === "page-n-of-total" ? `Page ${n} of ${total}` : `${n} / ${total}`;
+export const fillTemplate = (template: string, n: number, total: number) =>
+  template.replace(/\{n(?::(\d{1,2}))?\}/g, (_, w) => (w ? String(n).padStart(+w, "0") : String(n))).replace(/\{total\}/g, String(total));
+
+export const formatNumber = (fmt: NumberFormat, n: number, total: number, template = "") =>
+  fmt === "custom" ? fillTemplate(template, n, total)
+    : fmt === "n" ? `${n}` : fmt === "page-n" ? `Page ${n}` : fmt === "page-n-of-total" ? `Page ${n} of ${total}` : `${n} / ${total}`;
 
 /**
  * Map a point in the page's *visual* (as displayed, after /Rotate) coordinate
@@ -56,6 +63,10 @@ export async function stampPages(bytes: Uint8Array, opts: StampOptions): Promise
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const pages = doc.getPages();
   const total = pages.length + (opts.numbers ? opts.numbers.start - 1 : 0);
+  // Custom header/footer text may need the Unicode fallback font.
+  let numFont = font;
+  const n0 = opts.numbers;
+  if (n0?.format === "custom" && unsupportedChars(n0.template ?? "").length && opts.unicodeFont) numFont = await embedUnicode(doc, opts.unicodeFont);
   pages.forEach((page, i) => {
     const { W, H } = visualSize(page);
     const wm = opts.watermark;
@@ -74,13 +85,15 @@ export async function stampPages(bytes: Uint8Array, opts: StampOptions): Promise
     }
     const n = opts.numbers;
     if (n && !(n.skipFirst && i === 0)) {
-      const label = formatNumber(n.format, i + n.start, total);
+      const raw = formatNumber(n.format, i + n.start, total, n.template).trim();
+      const label = numFont === font ? [...raw].map((ch) => (unsupportedChars(ch).length ? "?" : ch)).join("") : raw;
+      if (!label) return;
       const size = n.size ?? 10;
-      const tw = font.widthOfTextAtSize(label, size);
+      const tw = numFont.widthOfTextAtSize(label, size);
       const margin = Math.max(18, Math.min(36, H * 0.04));
       const vx = n.position.endsWith("center") ? (W - tw) / 2 : n.position.endsWith("right") ? W - margin - tw : margin;
       const vy = n.position.startsWith("top") ? H - margin - size * 0.75 : margin;
-      drawVisualText(page, font, label, size, vx, vy, 0);
+      drawVisualText(page, numFont, label, size, vx, vy, 0);
     }
   });
   if (password) doc.encrypt({ userPassword: password, ownerPassword: password });

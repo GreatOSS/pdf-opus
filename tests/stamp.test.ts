@@ -18,6 +18,11 @@ describe("visualToUser", () => {
 });
 
 describe("stampPages", () => {
+  it("fills custom header/footer templates, incl. Bates numbers", () => {
+    expect(formatNumber("custom", 7, 120, "ACME-{n:6}")).toBe("ACME-000007");
+    expect(formatNumber("custom", 3, 12, "Confidential — Page {n} of {total}")).toBe("Confidential — Page 3 of 12");
+    expect(formatNumber("custom", 3, 12, "{n:3}/{n}")).toBe("003/3");
+  });
   it("formats numbers", () => {
     expect(formatNumber("page-n-of-total", 2, 9)).toBe("Page 2 of 9");
     expect(formatNumber("n-slash-total", 3, 4)).toBe("3 / 4");

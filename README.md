@@ -15,7 +15,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 - **Recognize text (OCR)** — make scanned pages searchable and selectable; runs on your device (English, German, French, Spanish, Italian, Portuguese, Dutch).
 - **Reduce file size** — shrink oversized photos and scans (two quality levels, undoable) while text and drawings stay sharp.
 - **Combine & convert** — open or drop several PDFs and JPEG/PNG images at once to combine them into one PDF.
-- **Page numbers & watermarks** — stamped into the page content (correct on rotated pages), with several formats and a cover-page option.
+- **Page numbers, headers/footers & watermarks** — stamped into the page content (correct on rotated pages): several number formats, custom header/footer text and Bates numbers (e.g. `ACME-{n:6}`), cover-page option.
 - **Organize pages** — drag thumbnails to reorder, rotate, delete, insert blank pages, insert or append other PDFs, and extract a page range to a new PDF. Forms and annotations survive page edits.
 - **Undo/redo** for both annotations and page edits.
 - **Save in place** where the browser supports the File System Access API (Chrome, Edge), otherwise download. Unsaved-change protection.

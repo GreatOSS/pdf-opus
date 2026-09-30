@@ -215,6 +215,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — WebKit: text box + typed signature
 - WebKit (Playwright, Safari engine), tracemonkey p1: Add text → click → typed “WebKit note”; Add signature → Type tab → “Ada Lovelace” → Place signature → click on page (move/resize handles, Alt text button shown); Save → download. Saved file has a FreeText and a Stamp annotation; Poppler renders both where placed. No console errors. No changes needed.
 
+### 2026-09-30 — Headers/footers & Bates numbers
+- More → “Page numbers, headers & watermark…”: new Format “Custom text…” shows a Text field ({n}, {n:6} zero-padded, {total}); new position Top left. tracemonkey: “ACME-{n:6} · Łódź office”, Top right, start 42 → saved: pdftotext p1 “ACME-000042 · Łódź office”, p14 “ACME-000055 …”; non-WinAnsi text uses the DejaVu subset (pdffonts), Poppler render clean. Template field hidden unless Custom is chosen. unit 52/52.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
