@@ -167,6 +167,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Redact: Find & mark
 - New “Find & mark…” in the Redact tool marks every (case-insensitive) occurrence. w9 “taxpayer”: 12 marks on 5 pages → applied → pdftotext: 0 left (was 12). First version estimated extents with equal-width characters and left a stray “r” of a bold “Taxpayer” → now uses proportional widths from canvas text measurement (item's font family) scaled to pdf.js's item width, plus 0.4-char padding; re-run: no fragments, neighbours (“Identification Number (TIN)”) intact. tracemonkey “trace”: 416 → 0; substring semantics (“traces” keeps its “s”). Limits: matches spanning two text items and rotated text aren't found (rotated ones are counted and reported).
 
+### 2026-09-30 — Reduce file size
+- New More → “Reduce file size…” (Balanced: long edge ≤2600 px, JPEG q0.82; Smallest: ≤1600 px, q0.7). Dropped a generated 4000×3000 noisy JPEG (6.1 MB PDF) → Balanced → “Reduced from 6.1 MB to 874 KB (1 image recompressed)”; saved: pdfimages shows 2600×1950 JPEG, Poppler render looks right. tracemonkey (no photos) → 1.0 MB → 964 KB from object streams alone. Lossless (Flate) images are only downscaled, never turned into JPEG; CMYK JPEGs, masks, Decode arrays are left alone; an image is only replaced if ≥10% smaller; the whole step is undoable.
+
 ### Known gaps / next
 - Redaction: inline images (BI…EI) aren't handled yet; JBIG2/CCITT images under a mark are removed whole. Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).

@@ -123,6 +123,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miSaveAs">Save as…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
   <button role="menuitem" id="miStamp">Page numbers & watermark…</button>
+  <button role="menuitem" id="miCompress">Reduce file size…</button>
   <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <hr />
   <button role="menuitem" id="miSpread">Two-page view</button>
@@ -436,10 +437,12 @@ async function mutatePages(label: string, fn: (bytes: Uint8Array) => Promise<Uin
     return true;
   } catch (e: any) {
     hideLoading();
-    toast(`${label} failed: ${e?.message ?? e}`, "error");
+    if (!(e instanceof Unchanged)) toast(`${label} failed: ${e?.message ?? e}`, "error");
     return false;
   }
 }
+/** Thrown from a mutatePages step when there is nothing to change (no undo step, no error toast). */
+class Unchanged extends Error {}
 const crypt = () => ({ password: doc?.password ?? "" });
 const identityPlan = (): PagePlanEntry[] => Array.from({ length: doc!.pdf.numPages }, (_, i) => ({ source: i }));
 
@@ -850,6 +853,35 @@ function expandToAllPages(marks: { pageIndex: number; rect: [number, number, num
   }
   return out;
 }
+const mb = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
+async function compressDialog() {
+  if (!doc) return;
+  const level = el("select", { className: "zoom-select", ariaLabel: "Quality" }, [
+    el("option", { value: "balanced", textContent: "Balanced — good for printing" }),
+    el("option", { value: "small", textContent: "Smallest — good for screens and email" }),
+  ]) as HTMLSelectElement;
+  const size = doc.bytes.length;
+  const ok = await showDialog({
+    title: "Reduce file size",
+    message: `This file is ${mb(size)}. Large photos and scans are scaled down and recompressed; text, drawings and lossless images stay sharp. You can undo this.`,
+    body: el("label", { className: "form-row" }, [el("span", { textContent: "Quality" }), level]),
+    buttons: [{ label: "Cancel", value: false }, { label: "Reduce", value: true, primary: true }],
+  });
+  if (!ok) return;
+  const opts = level.value === "small" ? { maxEdge: 1600, quality: 0.7 } : { maxEdge: 2600, quality: 0.82 };
+  let result: { before: number; after: number; images: number } | null = null;
+  const done = await mutatePages("Reducing file size", async (b) => {
+    const r = await (await import("./compress")).compressImages(b, { ...crypt(), ...opts }, (i, n) => showLoading(`Reducing file size… ${i}/${n} images`));
+    if (r.after >= r.before * 0.97) { result = r; throw new Unchanged(); }
+    result = r;
+    return r.bytes;
+  }, viewer.currentPageNumber, true);
+  const r = result as { before: number; after: number; images: number } | null;
+  if (!r) return;
+  if (done) toast(`Reduced from ${mb(r.before)} to ${mb(r.after)} (${r.images ? `${r.images} image${r.images === 1 ? "" : "s"} recompressed` : "packed more efficiently"}). Save to keep it.`);
+  else toast(`This file is already compact — nothing worth shrinking (${mb(r.before)}).`);
+}
+
 /** Mark every occurrence of a phrase (e.g. a name or account number) for redaction. */
 async function findAndMark() {
   if (!doc) return;
@@ -1226,6 +1258,7 @@ on("#miMerge", () => doc && insertPdfAt(doc.pdf.numPages));
 on("#miSpread", () => { viewer.spreadMode = viewer.spreadMode === 1 ? 0 : 1; });
 on("#miProps", showProperties);
 on("#miStamp", stampDialog);
+on("#miCompress", compressDialog);
 on("#miShortcuts", showShortcuts);
 on("#miClose", closeDocument);
 on("#pgRotL", () => rotatePages(thumbs.selected(), -90));

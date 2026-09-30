@@ -487,7 +487,7 @@ const namesOf = (ctx: PDFDocument["context"], v: unknown): string[] => {
 };
 
 /** Components per pixel for simple colour spaces, or undefined if unknown. */
-function components(ctx: PDFDocument["context"], cs: unknown): number | undefined {
+export function components(ctx: PDFDocument["context"], cs: unknown): number | undefined {
   const o = ctx.lookup(cs as any);
   if (o instanceof PDFName) return ({ DeviceGray: 1, DeviceRGB: 3, DeviceCMYK: 4, CalGray: 1, CalRGB: 3 } as Record<string, number>)[o.decodeText()];
   if (o instanceof PDFArray) {
@@ -501,7 +501,7 @@ function components(ctx: PDFDocument["context"], cs: unknown): number | undefine
 }
 
 /** Undo PNG predictors (Predictor ≥ 10) in place-ish; returns the unfiltered rows. */
-function unpredictPng(data: Uint8Array, rowBytes: number, bpp: number, rows: number): Uint8Array | null {
+export function unpredictPng(data: Uint8Array, rowBytes: number, bpp: number, rows: number): Uint8Array | null {
   const out = new Uint8Array(rowBytes * rows);
   for (let r = 0; r < rows; r++) {
     const src = r * (rowBytes + 1);
