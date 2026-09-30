@@ -160,11 +160,11 @@ export function setupEditText(ctx: Ctx) {
     const r = cssRectOf(view, run);
     const canvas = pageEl.querySelector("canvas") as HTMLCanvasElement | null;
     const colors = canvas ? sampleColors(canvas, r, pageEl.clientWidth) : { bg: [1, 1, 1] as [number, number, number], fg: [0, 0, 0] as [number, number, number] };
-    let realName = "";
-    try { realName = page.commonObjs.has(run.fontName) ? page.commonObjs.get(run.fontName)?.name ?? "" : ""; } catch { /* font not loaded */ }
+    let font: { name?: string; bold?: boolean; black?: boolean; italic?: boolean } = {};
+    try { font = page.commonObjs.has(run.fontName) ? page.commonObjs.get(run.fontName) ?? {} : {}; } catch { /* font not loaded */ }
+    const realName = font.name ?? "";
     const family = familyOf(styles[run.fontName]?.fontFamily, realName);
-    const bold = /bold|black|heavy|semibold|demi/i.test(realName);
-    const italic = /italic|oblique/i.test(realName);
+    const { bold, italic } = fontStyle(realName, font);
     // Treat runs centred on the text block (or page) as centred text, so shorter/longer
     // replacements stay centred. Block edges are estimated from all runs on the page.
     const isCentered = looksCentered(run, hit.runs, page.view as number[]);
@@ -229,5 +229,14 @@ export function setupEditText(ctx: Ctx) {
 
   return {
     reset() { cache.clear(); hover.remove(); if (editing) (editing as any)._finish(false); },
+  };
+}
+
+/** Weight/slant of a PDF font from pdf.js's flags plus its name (URW "Medi", TeX "CMBX"/"CMTI", "Bd", "Ital" …). */
+export function fontStyle(name: string, flags: { bold?: boolean; black?: boolean; italic?: boolean } = {}) {
+  const n = name.replace(/^[A-Z]{6}\+/, ""); // drop the subset prefix
+  return {
+    bold: !!(flags.bold || flags.black) || /bold|black|heavy|semibold|demi|medi(?!um)|(^|[-,_])bd|^cmbx|^cmb\d/i.test(n),
+    italic: !!flags.italic || /ital|oblique|slant|(^|[-,_])it($|[-,_])|^cmti|^cmsl/i.test(n),
   };
 }

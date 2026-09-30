@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupRuns, looksCentered, unsupportedChars } from "../src/edittext";
+import { fontStyle, groupRuns, looksCentered, unsupportedChars } from "../src/edittext";
 
 const item = (str: string, x: number, y: number, width: number, size = 10, fontName = "f1") => ({ str, transform: [size, 0, 0, size, x, y], width, fontName });
 
@@ -37,5 +37,19 @@ describe("looksCentered", () => {
     const single = Array.from({ length: 40 }, () => ({ x: 72, width: 468 }));
     expect(looksCentered({ x: 92, width: 448 }, single, view)).toBe(false); // first-line indent of 20pt
     expect(looksCentered({ x: 72, width: 200 }, single, view)).toBe(false);
+  });
+});
+
+describe("fontStyle", () => {
+  it("recognises bold and italic from common font names", () => {
+    expect(fontStyle("TACTGM+NimbusRomNo9L-Medi")).toEqual({ bold: true, italic: false });
+    expect(fontStyle("NimbusRomNo9L-MediItal")).toEqual({ bold: true, italic: true });
+    expect(fontStyle("NimbusRomNo9L-ReguItal")).toEqual({ bold: false, italic: true });
+    expect(fontStyle("CMBX10")).toEqual({ bold: true, italic: false });
+    expect(fontStyle("CMTI10").italic).toBe(true);
+    expect(fontStyle("Arial,Bold").bold).toBe(true);
+    expect(fontStyle("Roboto-Medium").bold).toBe(false);
+    expect(fontStyle("NimbusRomNo9L-Regu")).toEqual({ bold: false, italic: false });
+    expect(fontStyle("Whatever", { bold: true }).bold).toBe(true);
   });
 });
