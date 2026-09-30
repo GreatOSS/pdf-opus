@@ -119,28 +119,41 @@ export interface TextEdit {
   /** The text being replaced. When all its glyphs are removed from the page, nothing is painted over it. */
   original?: string;
   /** A paragraph: wrap the text to this width (first line indented by `indent`), lines `lineHeight` apart. */
-  wrap?: { width: number; lineHeight: number; indent?: number };
+  wrap?: { width: number; lineHeight: number; indent?: number; justify?: boolean };
 }
 
 /** Greedy word wrap; "\n" forces a break, words wider than a line are broken by character. */
 export function wrapText(text: string, measure: (s: string) => number, width: number, indent = 0): string[] {
-  const out: string[] = [];
+  return wrapLines(text, measure, width, indent).map((l) => l.text);
+}
+
+/** wrapText, also telling which lines end a paragraph (last line, or before a typed line break). */
+export function wrapLines(text: string, measure: (s: string) => number, width: number, indent = 0): { text: string; end: boolean }[] {
+  const out: { text: string; end: boolean }[] = [];
+  const push = (t: string, end = false) => { out.push({ text: t, end }); };
   for (const para of text.split("\n")) {
     let line = "";
     const room = () => width - (out.length === 0 ? indent : 0);
     for (const word of para.split(/ +/).filter(Boolean)) {
       const tryLine = line ? `${line} ${word}` : word;
       if (measure(tryLine) <= room()) { line = tryLine; continue; }
-      if (line) { out.push(line); line = ""; }
+      // A compound word ("dynamically-typed") may break after its own hyphen.
       let w = word;
+      for (let h = word.lastIndexOf("-", word.length - 2); h > 0; h = word.lastIndexOf("-", h - 1)) {
+        const head = word.slice(0, h + 1);
+        if (measure(line ? `${line} ${head}` : head) <= room()) { push(line ? `${line} ${head}` : head); line = ""; w = word.slice(h + 1); break; }
+      }
+      if (w !== word) {
+        if (measure(w) <= room()) { line = w; continue; }
+      } else if (line) { push(line); line = ""; }
       while (measure(w) > room() && w.length > 1) {
         let n = w.length - 1;
         while (n > 1 && measure(w.slice(0, n)) > room()) n--;
-        out.push(w.slice(0, n)); w = w.slice(n);
+        push(w.slice(0, n)); w = w.slice(n);
       }
       line = w;
     }
-    out.push(line);
+    push(line, true);
   }
   return out;
 }
@@ -178,9 +191,17 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
     // Without the fallback font, standard fonts only cover WinAnsi; replace anything else rather than failing.
     const safe = font === uni ? e.text : [...e.text].map((ch) => (unsupportedChars(ch).length ? "?" : ch)).join("");
     if (e.wrap) {
-      const { width, lineHeight, indent = 0 } = e.wrap;
-      wrapText(safe, (t) => font.widthOfTextAtSize(t, e.size), width, indent).forEach((line, i) => {
-        if (line.trim()) page.drawText(line, { x: e.x + (i === 0 ? indent : 0), y: e.y - i * lineHeight, size: e.size, font, color: rgb(...e.color) });
+      const { width, lineHeight, indent = 0, justify } = e.wrap;
+      const measure = (t: string) => font.widthOfTextAtSize(t, e.size);
+      wrapLines(safe, measure, width, indent).forEach(({ text: line, end }, i) => {
+        const x0 = e.x + (i === 0 ? indent : 0), y = e.y - i * lineHeight, opts = { size: e.size, font, color: rgb(...e.color) };
+        const words = line.split(" ");
+        if (justify && !end && words.length > 1) {
+          // Spread the words over the line, as the original justified text was.
+          const gap = (width - (i === 0 ? indent : 0) - words.reduce((a, w) => a + measure(w), 0)) / (words.length - 1);
+          let x = x0;
+          for (const w of words) { page.drawText(w, { ...opts, x, y }); x += measure(w) + gap; }
+        } else if (line.trim()) page.drawText(line, { ...opts, x: x0, y });
       });
       continue;
     }

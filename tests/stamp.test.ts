@@ -73,6 +73,7 @@ describe("wrapText", () => {
     expect(wrapText("aa bb cc", m, 5, 2)).toEqual(["aa", "bb cc"]);
     expect(wrapText("aa\nbb cc", m, 10)).toEqual(["aa", "bb cc"]);
     expect(wrapText("abcdefghij", m, 4)).toEqual(["abcd", "efgh", "ij"]);
+    expect(wrapText("aa dynamic-typed x", m, 12)).toEqual(["aa dynamic-", "typed x"]);
   });
   it("writes a paragraph as wrapped lines", async () => {
     const d = await PDFDocument.create();
@@ -86,6 +87,24 @@ describe("wrapText", () => {
     const ys = [...new Set(items.map((i: any) => Math.round(i.transform[5])))];
     expect(ys).toEqual([700, 686, 672]);
     expect(Math.max(...items.map((i: any) => i.transform[4] + i.width))).toBeLessThanOrEqual(200.5);
+  });
+});
+
+describe("justified paragraphs", () => {
+  it("spreads all but the last line to the full width", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([600, 800]);
+    const out = await applyTextEdits(await d.save(), [{
+      pageIndex: 0, rect: [50, 640, 200, 70], x: 50, y: 700, size: 12, text: "The quick brown fox jumps over the lazy dog again and again and then rests",
+      family: "sans", bold: false, italic: false, color: [0, 0, 0], background: [1, 1, 1], wrap: { width: 150, lineHeight: 14, justify: true },
+    }]);
+    const pdf = await pdfjs.getDocument({ data: out.slice() }).promise;
+    const items = (await (await pdf.getPage(1)).getTextContent()).items.filter((i: any) => i.str.trim()) as any[];
+    const rightOf = (y: number) => Math.max(...items.filter((i) => Math.round(i.transform[5]) === y).map((i) => i.transform[4] + i.width));
+    const ys = [...new Set(items.map((i) => Math.round(i.transform[5])))].sort((a, b) => b - a);
+    expect(ys.length).toBeGreaterThan(2);
+    for (const y of ys.slice(0, -1)) expect(rightOf(y)).toBeCloseTo(200, 0);
+    expect(rightOf(ys[ys.length - 1])).toBeLessThan(195); // last line stays ragged
   });
 });
 

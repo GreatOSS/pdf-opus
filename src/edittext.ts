@@ -82,6 +82,13 @@ export function paragraphOf(run: Run, runs: Run[]): Run[] {
   return [run];
 }
 
+/** Justified: at least three lines, and all but the last end flush with the column's right edge. */
+export function isJustified(para: { x: number; width: number; size: number }[]): boolean {
+  if (para.length < 3) return false;
+  const right = Math.max(...para.map((u) => u.x + u.width));
+  return para.slice(0, -1).every((u) => right - (u.x + u.width) < u.size * 0.3);
+}
+
 /**
  * A paragraph's lines as one string for editing. A word hyphenated across lines ("com-" + "pile") is
  * rejoined, since the text will wrap differently; other line-end hyphens stay, without a space.
@@ -232,6 +239,7 @@ export function setupEditText(ctx: Ctx) {
     const lineGap = multi ? (para[0].y - para[para.length - 1].y) / (para.length - 1) : run.size * 1.2;
     const indent = multi ? Math.max(0, para[0].x - left) : 0;
     const original = multi ? joinLines(para.map((u) => u.str)) : run.str;
+    const justify = isJustified(para);
     box.textContent = original;
     const rgbCss = (c: number[]) => `rgb(${c.map((v) => Math.round(v * 255)).join(",")})`;
     // Lay the box out in the text's own frame and turn it with the page: its top-left corner is the
@@ -244,7 +252,7 @@ export function setupEditText(ctx: Ctx) {
     const w = (multi ? colWidth : run.width) * k, h = run.size * 1.2 * k;
     Object.assign(box.style, multi ? {
       left: `${ox}px`, top: `${oy}px`, width: `${w + 2}px`, minHeight: `${lineGap * para.length * k}px`, lineHeight: `${lineGap * k}px`,
-      whiteSpace: "pre-wrap", textIndent: `${indent * k}px`,
+      whiteSpace: "pre-wrap", textIndent: `${indent * k}px`, textAlign: justify ? "justify" : "",
     } : {
       left: `${ox}px`, top: `${oy}px`, minWidth: `${w}px`, height: `${h}px`, lineHeight: `${h}px`,
     });
@@ -299,7 +307,8 @@ export function setupEditText(ctx: Ctx) {
         rect: multi ? [left - 0.5, lastY - run.size * 0.25, colWidth + 1, para[0].y - lastY + run.size * 1.2] : [run.x - 0.5, run.y - run.size * 0.25, run.width + 1, run.size * 1.2],
         x: multi ? left : run.x, y: para[0].y, size: run.size, text, family, bold, italic, color: colors.fg, background: colors.bg,
         align: isCentered ? "center" : "left", original: para.map((u) => u.str).join(""),
-        ...(multi ? { wrap: { width: colWidth + run.size * 0.2, lineHeight: lineGap, indent } } : {}),
+        // Ragged text gets a little slack (the replacement font may run slightly wider); justified text fills the column exactly.
+        ...(multi ? { wrap: { width: justify ? colWidth : colWidth + run.size * 0.2, lineHeight: lineGap, indent, justify } } : {}),
       });
     };
     (box as any)._finish = finish;

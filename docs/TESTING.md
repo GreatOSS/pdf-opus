@@ -385,4 +385,13 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Lines mixing fonts (a bold word mid-line), other sizes, uneven spacing | Stay single-line edits (unit tests) |
 | Outputs | `qpdf --check` and Ghostscript clean. unit 81/81, e2e 87/87 (new paragraph e2e in all browsers) |
 
-Known limits: rewrapped paragraphs are left-aligned (justification not kept); text in other fonts than the standard 14 is replaced with the closest standard font.
+Known limits: text in other fonts than the standard 14 is replaced with the closest standard font.
+
+## 2026-09-30 — justified paragraphs; paragraph edit on phone
+
+| Workflow | Result |
+|---|---|
+| tracemonkey abstract (justified): edit box previews justified; after editing, every line but the last ends flush with the column, last line ragged | OK. **Improved while testing:** lines with long compounds had very wide gaps — wrapping may now break after a word’s own hyphen (“dynamically-/typed”) |
+| Letter (ragged, 3 lines) | Correctly stays left-aligned (not mistaken for justified) |
+| iPhone 14 (WebKit): Edit tool → hint says “Tap any text…”; tap a paragraph line | Box covers the whole paragraph, aligned |
+| Outputs | `qpdf --check` and Ghostscript clean. unit 83/83, e2e 87/87 |

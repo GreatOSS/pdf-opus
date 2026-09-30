@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fontStyle, groupRuns, joinLines, looksCentered, paragraphOf, unsupportedChars } from "../src/edittext";
+import { fontStyle, groupRuns, isJustified, joinLines, looksCentered, paragraphOf, unsupportedChars } from "../src/edittext";
 
 const item = (str: string, x: number, y: number, width: number, size = 10, fontName = "f1") => ({ str, transform: [size, 0, 0, size, x, y], width, fontName });
 
@@ -78,5 +78,14 @@ describe("paragraphOf", () => {
   it("joins lines, rejoining hyphenated words", () => {
     expect(joinLines(["more difficult to com-", "pile than ", " others"])).toBe("more difficult to compile than others");
     expect(joinLines(["the Java-", "Script engine"])).toBe("the Java-Script engine");
+  });
+});
+
+describe("isJustified", () => {
+  const l = (x: number, width: number) => ({ x, width, size: 10 });
+  it("tells justified from ragged paragraphs", () => {
+    expect(isJustified([l(54, 243), l(54, 243.4), l(54, 242.8), l(54, 120)])).toBe(true);
+    expect(isJustified([l(54, 243), l(54, 225), l(54, 238), l(54, 120)])).toBe(false);
+    expect(isJustified([l(54, 243), l(54, 100)])).toBe(false); // too short to tell
   });
 });
