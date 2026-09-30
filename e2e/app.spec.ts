@@ -174,3 +174,19 @@ test("presents one page at a time and restores the view", async ({ page }) => {
   await expect(page.locator(".toolbar")).toBeVisible();
   await expect(page.locator(".page-input")).toHaveValue("2");
 });
+
+test("remembers recent files only when asked to", async ({ page }) => {
+  await open(page);
+  await page.locator("#btnMore").click();
+  await page.getByRole("menuitem", { name: "Close document" }).click();
+  await expect(page.locator("#recent")).toBeHidden();
+  await page.locator("#recentOn").check();
+  await page.locator("#fileInput").setInputFiles({ name: "report.pdf", mimeType: "application/pdf", buffer: await samplePdf(2) });
+  await expect(page.locator("#pageCount")).toHaveText("2");
+  await page.locator("#btnMore").click();
+  await page.getByRole("menuitem", { name: "Close document" }).click();
+  await page.reload();
+  await expect(page.locator(".recent-name")).toHaveText(["report.pdf"]);
+  await page.locator(".recent-open").click();
+  await expect(page).toHaveTitle("report.pdf — Leaflark");
+});

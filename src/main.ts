@@ -13,6 +13,7 @@ import { Thumbnails } from "./thumbnails";
 import { chooseSignature, dataUrlToFile } from "./signature";
 import { setupEditText, unsupportedChars } from "./edittext";
 import { missingGlyphs, unicodeFontBytes } from "./unifont";
+import * as recent from "./recent";
 import { setupRedact } from "./redactui";
 import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
 
@@ -112,6 +113,8 @@ $("#app").innerHTML = `
         <p>View, annotate, fill, sign and reorganize PDFs.<br />Your files never leave this device.</p>
         <button id="welcomeOpen" class="primary-btn big" type="button">${icons.open}<span>Open a PDF</span></button>
         <p class="hint">or drop PDFs or images anywhere · ${mod}O<br />Drop several files to combine them</p>
+        <div id="recent" class="recent" hidden><h2>Recent</h2><ul id="recentList" class="recent-list"></ul></div>
+        <label class="chk recent-opt"><input type="checkbox" id="recentOn" />Remember recent files on this device</label>
       </div>
     </section>
     <div id="loading" class="loading" hidden><div class="spinner"></div><span id="loadingText">Opening…</span><button id="loadingCancel" class="text-btn" type="button" hidden>Cancel</button></div>
@@ -284,6 +287,8 @@ async function openFiles(files: File[], handle: FileHandle | null = null) {
   if (doc) setDirty(false); // discard confirmed above
   await openBytes(res.bytes, res.name, single ? handle : null, { dirty: !single });
   if (files.length > 1) toast(`Combined ${files.length} files — save to keep the result.`);
+  // Only files that actually opened go into the (opt-in) recent list.
+  if (single && doc?.bytes === res.bytes) void recent.addRecent(files[0], res.bytes, handle);
 }
 const openFile = (file: File, handle: FileHandle | null = null) => openFiles([file], handle);
 
@@ -315,6 +320,7 @@ function closeDocument() {
     pdf.loadingTask.destroy();
     document.body.classList.remove("has-doc");
     $("#welcome").hidden = false;
+    void renderRecent();
     $("#findBar").hidden = true;
     $("#outline").replaceChildren();
     pageUndo.length = pageRedo.length = 0;
@@ -1311,6 +1317,38 @@ menu.addEventListener("keydown", (e) => {
 const on = (id: string, fn: () => void) => ($(id).onclick = fn);
 on("#btnOpen", pickAndOpen);
 on("#welcomeOpen", pickAndOpen);
+
+// ───────────────────────────── Recent files (opt-in) ─────────────────────────────
+async function renderRecent() {
+  const on = recent.recentEnabled();
+  ($("#recentOn") as HTMLInputElement).checked = on;
+  const list = await recent.listRecent().catch(() => []);
+  const ul = $("#recentList");
+  ul.replaceChildren(...list.map((e) => {
+    const when = new Date(e.when);
+    const today = when.toDateString() === new Date().toDateString();
+    const open = el("button", { className: "recent-open", type: "button", title: e.handle ? e.name : `${e.name} (copy kept on this device)` }, [
+      el("span", { className: "recent-name", textContent: e.name }),
+      el("span", { className: "recent-when", textContent: today ? when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : when.toLocaleDateString() }),
+    ]) as HTMLButtonElement;
+    open.onclick = async () => {
+      const got = await recent.readRecent(e).catch(() => null);
+      if (!got) { toast(`Couldn’t open “${e.name}” — it may have been moved or deleted, or access was declined.`, "error"); return; }
+      await openFile(got.file, got.handle);
+    };
+    const del = el("button", { className: "icon-btn recent-del", type: "button", ariaLabel: `Remove ${e.name} from the list`, title: "Remove from list", innerHTML: icons.close }) as HTMLButtonElement;
+    del.onclick = async () => { await recent.removeRecent(e.id); void renderRecent(); };
+    return el("li", {}, [open, del]);
+  }));
+  $("#recent").hidden = !list.length;
+}
+($("#recentOn") as HTMLInputElement).onchange = async (ev) => {
+  const on = (ev.target as HTMLInputElement).checked;
+  await recent.setRecentEnabled(on);
+  toast(on ? "Files you open from now on will be listed here. Where the browser can’t link to the file, a copy is kept in this browser." : "Recent files forgotten.");
+  void renderRecent();
+};
+void renderRecent();
 on("#btnSidebar", () => toggleSidebar());
 on("#btnZoomIn", () => zoom(1));
 on("#btnZoomOut", () => zoom(-1));

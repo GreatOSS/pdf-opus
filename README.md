@@ -19,6 +19,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 - **Organize pages** — drag thumbnails to reorder, rotate, delete, insert blank pages, insert or append other PDFs, and extract a page range to a new PDF. Forms and annotations survive page edits.
 - **Undo/redo** for both annotations and page edits.
 - **Present** — full-screen, one page at a time; arrow keys, Space or click to move, Esc to exit.
+- **Recent files** (opt-in) — listed on the start screen; stored only on this device and erased when you turn the option off.
 - **Save in place** where the browser supports the File System Access API (Chrome, Edge), otherwise download. Unsaved-change protection.
 - **Keyboard first** — shortcuts for every common action; see *More → Keyboard shortcuts*.
 - **Responsive** — works on phones and tablets with a bottom tool bar.
