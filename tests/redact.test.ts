@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PDFDocument, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream } from "@cantoo/pdf-lib";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { applyRedactions, removeTextFromPage, tokenize } from "../src/redact";
 
@@ -104,5 +104,66 @@ describe("Form XObjects", () => {
     };
     expect(await text(1)).toBe("");
     expect(await text(2)).toContain("Header SECRET");
+  });
+});
+
+describe("images under redaction marks", () => {
+  // A 10×10 RGB image, all white, stored as raw FlateDecode samples (PNG predictor rows).
+  async function withImage(opts: { predictor: boolean; jpeg?: boolean }) {
+    const { deflateSync } = await import("node:zlib");
+    const d = await PDFDocument.create();
+    const page = d.addPage([200, 200]);
+    const row = new Uint8Array(30).fill(255);
+    const raw = opts.predictor
+      ? Uint8Array.from(Array.from({ length: 10 }, () => [0, ...row]).flat())
+      : Uint8Array.from(Array.from({ length: 10 }, () => [...row]).flat());
+    const img = opts.jpeg
+      ? d.context.stream(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), { Type: "XObject", Subtype: "Image", Width: 10, Height: 10, ColorSpace: "DeviceRGB", BitsPerComponent: 8, Filter: "DCTDecode" })
+      : d.context.stream(deflateSync(raw), { Type: "XObject", Subtype: "Image", Width: 10, Height: 10, ColorSpace: "DeviceRGB", BitsPerComponent: 8, Filter: "FlateDecode",
+        ...(opts.predictor ? { DecodeParms: { Predictor: 15, Colors: 3, Columns: 10 } } : {}) });
+    const ref = d.context.register(img);
+    page.node.setXObject(PDFName.of("Im0"), ref);
+    // Draw the image at (100,100)–(200,200) twice (shared stream), as a real PDF might.
+    const content = d.context.flateStream(new TextEncoder().encode("q 100 0 0 100 100 100 cm /Im0 Do Q"));
+    page.node.set(PDFName.of("Contents"), d.context.register(content));
+    // A second page reusing the same image must keep it intact.
+    const p2 = d.addPage([200, 200]);
+    p2.node.setXObject(PDFName.of("Im0"), ref);
+    p2.node.set(PDFName.of("Contents"), d.context.register(d.context.flateStream(new TextEncoder().encode("q 100 0 0 100 100 100 cm /Im0 Do Q"))));
+    return d.save();
+  }
+  const pixels = async (bytes: Uint8Array, pageIndex: number) => {
+    const d = await PDFDocument.load(bytes);
+    const xo = d.getPage(pageIndex).node.Resources()!.lookup(PDFName.of("XObject"), PDFDict);
+    const s = d.context.lookup(xo.get(PDFName.of("Im0")));
+    return s instanceof PDFRawStream ? { dict: s.dict, data: decodePDFRawStream(s).decode() } : null;
+  };
+
+  for (const predictor of [false, true]) {
+    it(`overwrites covered pixels only (predictor: ${predictor})`, async () => {
+      // Mark the image's left half, lower 30% (image pixels x 0–4, rows 7–9).
+      const r = await applyRedactions(await withImage({ predictor }), [{ pageIndex: 0, rect: [100, 100, 50, 30] }]);
+      expect(r.images).toBe(1);
+      const p = (await pixels(r.bytes, 0))!;
+      expect(p.dict.get(PDFName.of("DecodeParms"))).toBeUndefined();
+      const at = (i: number, j: number) => p.data[j * 30 + i * 3];
+      expect(at(0, 9)).toBe(0);
+      expect(at(4, 7)).toBe(0);
+      expect(at(5, 9)).toBe(255); // right half untouched
+      expect(at(0, 6)).toBe(255); // upper rows untouched
+      // Page 2 still has the original image.
+      const orig = (await pixels(r.bytes, 1))!;
+      const samples = predictor ? orig.data.filter((_, k) => k % 31 !== 0) : orig.data; // skip PNG filter bytes
+      expect(samples.every((v) => v === 255)).toBe(true);
+    });
+  }
+  it("removes images it can't edit", async () => {
+    const r = await applyRedactions(await withImage({ predictor: false, jpeg: true }), [{ pageIndex: 0, rect: [100, 100, 50, 30] }]);
+    expect(r.imagesRemoved).toBe(1); // no canvas in Node, so the JPEG can't be decoded
+    expect((await pixels(r.bytes, 0))!.dict.get(PDFName.of("Subtype"))?.toString()).toBe("/Form"); // replaced by an empty form
+  });
+  it("ignores images outside the marks", async () => {
+    const r = await applyRedactions(await withImage({ predictor: false }), [{ pageIndex: 0, rect: [0, 0, 50, 50] }]);
+    expect(r.images + r.imagesRemoved).toBe(0);
   });
 });

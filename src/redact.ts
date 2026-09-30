@@ -329,18 +329,34 @@ function fontLookup(doc: PDFDocument, resources: PDFDict | undefined) {
  * copied (never edited in place) and the owner's resources are cloned, so other
  * pages that share the same form keep their text.
  */
-function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, resources: PDFDict | undefined, calls: { name: string; ctm: M }[], rects: Rect[], depth: number): number {
+function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, resources: PDFDict | undefined, calls: { name: string; ctm: M }[], rects: Rect[], depth: number, images: ImageJob[] = []): number {
   if (!resources || !calls.length || depth > 8) return 0;
   const ctx = doc.context;
   let res = resources;
   let cloned = false;
   let total = 0;
+  // Copy-on-write for this resources dict, so shared XObjects elsewhere stay untouched.
+  const ownXObjects = () => {
+    if (!cloned) {
+      res = res.clone(ctx);
+      res.set(PDFName.of("XObject"), res.lookup(PDFName.of("XObject"), PDFDict).clone(ctx));
+      setResources(res);
+      cloned = true;
+    }
+    return res.lookup(PDFName.of("XObject"), PDFDict);
+  };
   for (const call of calls) {
     const xobjs = res.lookupMaybe(PDFName.of("XObject"), PDFDict);
     const stream = xobjs ? ctx.lookup(xobjs.get(PDFName.of(call.name))) : undefined;
     if (!(stream instanceof PDFRawStream || stream instanceof PDFStream)) continue;
     const sdict = (stream as PDFRawStream).dict;
-    if ((sdict.get(PDFName.of("Subtype")) as PDFName | undefined)?.decodeText?.() !== "Form") continue;
+    const subtype = (sdict.get(PDFName.of("Subtype")) as PDFName | undefined)?.decodeText?.();
+    if (subtype === "Image" && stream instanceof PDFRawStream) {
+      const px = imagePixelRects(call.ctm, numOf(ctx, sdict, "Width") ?? 0, numOf(ctx, sdict, "Height") ?? 0, rects);
+      if (px.length) images.push({ xobjects: ownXObjects(), name: call.name, stream, px });
+      continue;
+    }
+    if (subtype !== "Form") continue;
     const bytes = decode(stream);
     if (!bytes) continue;
     const mat = sdict.lookupMaybe(PDFName.of("Matrix"), PDFArray);
@@ -350,26 +366,21 @@ function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, reso
     const nested: { name: string; ctm: M }[] = [];
     const { bytes: out, removed } = removeTextInRects(bytes, rects, fontLookup(doc, formRes), formCtm, (name, ctm) => nested.push({ name, ctm }));
     const dict = sdict.clone(ctx);
-    const nestedRemoved = processForms(doc, (r) => dict.set(PDFName.of("Resources"), r), formRes, nested, rects, depth + 1);
-    if (!removed && !nestedRemoved) continue;
+    const imagesBefore = images.length;
+    const nestedRemoved = processForms(doc, (r) => dict.set(PDFName.of("Resources"), r), formRes, nested, rects, depth + 1, images);
+    if (!removed && !nestedRemoved && images.length === imagesBefore) continue;
     const copy = ctx.flateStream(out);
     for (const [k, v] of dict.entries()) {
       if (!["Filter", "DecodeParms", "Length"].includes(k.decodeText())) copy.dict.set(k, v);
     }
-    if (!cloned) {
-      res = res.clone(ctx);
-      res.set(PDFName.of("XObject"), res.lookup(PDFName.of("XObject"), PDFDict).clone(ctx));
-      setResources(res);
-      cloned = true;
-    }
-    res.lookup(PDFName.of("XObject"), PDFDict).set(PDFName.of(call.name), ctx.register(copy));
+    ownXObjects().set(PDFName.of(call.name), ctx.register(copy));
     total += removed + nestedRemoved;
   }
   return total;
 }
 
 /** Apply text removal to a page, including text drawn via Form XObjects. */
-export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[]): number {
+export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[], images?: ImageJob[]): number {
   const ctx = doc.context;
   const node = page.node;
   const contents = node.get(PDFName.of("Contents"));
@@ -383,7 +394,7 @@ export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[
   const forms: { name: string; ctm: M }[] = [];
   const { bytes, removed } = removeTextInRects(joined, rects, fontLookup(doc, resources), [1, 0, 0, 1, 0, 0], (name, ctm) => forms.push({ name, ctm }));
   if (removed) node.set(PDFName.of("Contents"), ctx.register(ctx.flateStream(bytes)));
-  return removed + processForms(doc, (r) => node.set(PDFName.of("Resources"), r), resources, forms, rects, 0);
+  return removed + processForms(doc, (r) => node.set(PDFName.of("Resources"), r), resources, forms, rects, 0, images);
 }
 
 export interface RedactionMark { pageIndex: number; rect: Rect }
@@ -394,9 +405,9 @@ const overlaps = (a: Rect, b: Rect) => a[0] < b[0] + b[2] && b[0] < a[0] + a[2] 
  * Permanently redact areas: remove the text underneath, delete overlapping
  * annotations/form widgets, and paint the areas black.
  */
-export async function applyRedactions(bytes: Uint8Array, marks: RedactionMark[], { password = "", scrubMetadata = false }: { password?: string; scrubMetadata?: boolean } = {}): Promise<{ bytes: Uint8Array; glyphs: number }> {
+export async function applyRedactions(bytes: Uint8Array, marks: RedactionMark[], { password = "", scrubMetadata = false }: { password?: string; scrubMetadata?: boolean } = {}): Promise<{ bytes: Uint8Array; glyphs: number; images: number; imagesRemoved: number }> {
   const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
-  let glyphs = 0;
+  let glyphs = 0, imagesEdited = 0, imagesRemoved = 0;
   if (scrubMetadata) {
     // Clear the Info dictionary and drop XMP metadata, which often repeats author/title.
     const info = doc.context.trailerInfo.Info;
@@ -407,7 +418,23 @@ export async function applyRedactions(bytes: Uint8Array, marks: RedactionMark[],
   for (const m of marks) byPage.set(m.pageIndex, [...(byPage.get(m.pageIndex) ?? []), m.rect]);
   for (const [idx, rects] of byPage) {
     const page = doc.getPage(idx);
-    glyphs += removeTextFromPage(doc, page, rects);
+    const images: ImageJob[] = [];
+    glyphs += removeTextFromPage(doc, page, rects, images);
+    // The same image can be drawn more than once; erase all covered areas in one copy.
+    const merged = new Map<PDFDict, Map<string, ImageJob>>();
+    for (const j of images) {
+      const byName = merged.get(j.xobjects) ?? new Map<string, ImageJob>();
+      merged.set(j.xobjects, byName);
+      const prev = byName.get(j.name);
+      byName.set(j.name, prev ? { ...prev, px: [...prev.px, ...j.px] } : j);
+    }
+    for (const job of [...merged.values()].flatMap((m) => [...m.values()])) {
+      const erased = await eraseImage(doc, job.stream, job.px).catch(() => null);
+      // Formats we can't edit (e.g. JBIG2/CCITT scans) are dropped entirely rather than left intact.
+      const replacement = erased ?? doc.context.formXObject([], { BBox: [0, 0, 0, 0] });
+      job.xobjects.set(PDFName.of(job.name), doc.context.register(replacement));
+      if (erased) imagesEdited++; else imagesRemoved++;
+    }
     const annots = page.node.Annots();
     if (annots) {
       for (let i = annots.size() - 1; i >= 0; i--) {
@@ -422,5 +449,135 @@ export async function applyRedactions(bytes: Uint8Array, marks: RedactionMark[],
     for (const [x, y, w, h] of rects) page.drawRectangle({ x, y, width: w, height: h, color: rgb(0, 0, 0) });
   }
   if (password) doc.encrypt({ userPassword: password, ownerPassword: password });
-  return { bytes: await doc.save(), glyphs };
+  return { bytes: await doc.save(), glyphs, images: imagesEdited, imagesRemoved };
+}
+
+// ───────────── Images under redaction marks ─────────────
+
+type PixRect = [number, number, number, number]; // i0, j0, i1, j1 (columns, rows from the top)
+interface ImageJob { xobjects: PDFDict; name: string; stream: PDFRawStream; px: PixRect[] }
+
+function invert(m: M): M | null {
+  const det = m[0] * m[3] - m[1] * m[2];
+  if (Math.abs(det) < 1e-12) return null;
+  return [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
+}
+
+/** Pixel areas of a W×H image (drawn into the unit square by `ctm`) covered by the rects. Over-approximates for rotated images. */
+export function imagePixelRects(ctm: M, W: number, H: number, rects: Rect[]): PixRect[] {
+  const inv = invert(ctm);
+  if (!inv) return [];
+  const out: PixRect[] = [];
+  const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+  for (const [x, y, w, h] of rects) {
+    const pts = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([px, py]) => apply(inv, px, py));
+    const us = pts.map((p) => p[0]), vs = pts.map((p) => p[1]);
+    const [u0, u1, v0, v1] = [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs)];
+    if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) continue;
+    const r: PixRect = [clamp(Math.floor(u0 * W), W), clamp(Math.floor((1 - v1) * H), H), clamp(Math.ceil(u1 * W), W), clamp(Math.ceil((1 - v0) * H), H)];
+    if (r[2] > r[0] && r[3] > r[1]) out.push(r);
+  }
+  return out;
+}
+
+const numOf = (ctx: PDFDocument["context"], d: PDFDict, key: string) => { const v = ctx.lookup(d.get(PDFName.of(key))); return v instanceof PDFNumber ? v.asNumber() : undefined; };
+const namesOf = (ctx: PDFDocument["context"], v: unknown): string[] => {
+  const o = ctx.lookup(v as any);
+  return o instanceof PDFName ? [o.decodeText()] : o instanceof PDFArray ? o.asArray().map((n) => (ctx.lookup(n) as PDFName).decodeText()) : [];
+};
+
+/** Components per pixel for simple colour spaces, or undefined if unknown. */
+function components(ctx: PDFDocument["context"], cs: unknown): number | undefined {
+  const o = ctx.lookup(cs as any);
+  if (o instanceof PDFName) return ({ DeviceGray: 1, DeviceRGB: 3, DeviceCMYK: 4, CalGray: 1, CalRGB: 3 } as Record<string, number>)[o.decodeText()];
+  if (o instanceof PDFArray) {
+    const kind = (ctx.lookup(o.get(0)) as PDFName).decodeText();
+    if (kind === "ICCBased") { const s = ctx.lookup(o.get(1)); return s instanceof PDFRawStream ? numOf(ctx, s.dict, "N") : undefined; }
+    if (kind === "Indexed") return 1;
+    if (kind === "CalGray") return 1;
+    if (kind === "CalRGB" || kind === "Lab") return 3;
+  }
+  return undefined;
+}
+
+/** Undo PNG predictors (Predictor ≥ 10) in place-ish; returns the unfiltered rows. */
+function unpredictPng(data: Uint8Array, rowBytes: number, bpp: number, rows: number): Uint8Array | null {
+  const out = new Uint8Array(rowBytes * rows);
+  for (let r = 0; r < rows; r++) {
+    const src = r * (rowBytes + 1);
+    if (src + rowBytes >= data.length + 1) return null;
+    const type = data[src];
+    for (let i = 0; i < rowBytes; i++) {
+      const x = data[src + 1 + i];
+      const a = i >= bpp ? out[r * rowBytes + i - bpp] : 0;
+      const b = r > 0 ? out[(r - 1) * rowBytes + i] : 0;
+      const c = r > 0 && i >= bpp ? out[(r - 1) * rowBytes + i - bpp] : 0;
+      let v: number;
+      switch (type) {
+        case 0: v = x; break;
+        case 1: v = x + a; break;
+        case 2: v = x + b; break;
+        case 3: v = x + ((a + b) >> 1); break;
+        case 4: { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c); break; }
+        default: return null;
+      }
+      out[r * rowBytes + i] = v & 255;
+    }
+  }
+  return out;
+}
+
+/**
+ * Return a copy of the image with the covered pixels overwritten (black for JPEG, zero samples
+ * otherwise — the area is painted black on the page anyway), or null if the format isn't supported.
+ */
+async function eraseImage(doc: PDFDocument, stream: PDFRawStream, px: PixRect[]): Promise<PDFStream | null> {
+  const ctx = doc.context;
+  const d = stream.dict;
+  const W = numOf(ctx, d, "Width"), H = numOf(ctx, d, "Height");
+  if (!W || !H || d.get(PDFName.of("ImageMask"))?.toString() === "true") return null;
+  const filters = namesOf(ctx, d.get(PDFName.of("Filter")));
+  const copyDict = (skip: string[], extra: Record<string, any>) => {
+    const entries: Record<string, any> = {};
+    for (const [k, v] of d.entries()) if (!["Filter", "DecodeParms", "Length", ...skip].includes(k.decodeText())) entries[k.decodeText()] = v;
+    return { ...entries, ...extra };
+  };
+  if (filters.length === 1 && filters[0] === "DCTDecode") {
+    if (typeof createImageBitmap !== "function" || typeof OffscreenCanvas === "undefined") return null;
+    const bmp = await createImageBitmap(new Blob([stream.contents as BlobPart], { type: "image/jpeg" }));
+    const canvas = new OffscreenCanvas(W, H);
+    const g = canvas.getContext("2d")!;
+    g.drawImage(bmp, 0, 0, W, H);
+    g.fillStyle = "#000";
+    for (const [i0, j0, i1, j1] of px) g.fillRect(i0, j0, i1 - i0, j1 - j0);
+    const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 });
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    return ctx.stream(bytes, copyDict(["Decode", "ColorSpace", "BitsPerComponent"], { Filter: "DCTDecode", ColorSpace: "DeviceRGB", BitsPerComponent: 8 }));
+  }
+  if (!filters.every((f) => ["FlateDecode", "LZWDecode", "ASCII85Decode", "ASCIIHexDecode", "RunLengthDecode"].includes(f))) return null;
+  const bpc = numOf(ctx, d, "BitsPerComponent") ?? 8;
+  const n = components(ctx, d.get(PDFName.of("ColorSpace")));
+  if (!n || ![1, 2, 4, 8].includes(bpc)) return null;
+  let data: Uint8Array;
+  try { data = decodePDFRawStream(stream).decode(); } catch { return null; }
+  const rowBytes = Math.ceil((W * n * bpc) / 8);
+  const parms = ctx.lookup(d.get(PDFName.of("DecodeParms")) as any);
+  const predictor = parms instanceof PDFDict ? numOf(ctx, parms, "Predictor") ?? 1 : 1;
+  if (predictor >= 10) {
+    const un = unpredictPng(data, rowBytes, Math.max(1, Math.ceil((n * bpc) / 8)), H);
+    if (!un) return null;
+    data = un;
+  } else if (predictor !== 1) return null;
+  if (data.length < rowBytes * H) return null;
+  data = data.slice(0, rowBytes * H);
+  for (const [i0, j0, i1, j1] of px) {
+    for (let j = j0; j < j1; j++) {
+      if (bpc === 8) data.fill(0, j * rowBytes + i0 * n, j * rowBytes + i1 * n);
+      else for (let i = i0; i < i1; i++) for (let k = 0; k < n; k++) {
+        const bit = (i * n + k) * bpc, byte = j * rowBytes + (bit >> 3), shift = 8 - bpc - (bit & 7);
+        data[byte] &= ~(((1 << bpc) - 1) << shift);
+      }
+    }
+  }
+  return ctx.flateStream(data, copyDict([], {}));
 }

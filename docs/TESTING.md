@@ -161,6 +161,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Text boxes with Unicode
 - On save, text boxes pdf.js left without an appearance (non-WinAnsi text) now get one drawn with the DejaVu subset. tracemonkey: “Reviewed ✓ Łódź” + “Ωμέγα line 2” → Poppler renders both lines (first try clipped “Łódź”: pdf.js sized the box for Helvetica → text now shrinks to fit the box width). ASCII boxes keep pdf.js's own appearance. “日本 ✓” → one warning (CJK not in DejaVu; was shown 2–3× — toasts now de-duplicate). Reopened the saved file in Leaflark: boxes display.
 
+### 2026-09-30 — Redaction erases image pixels
+- Dropped a generated 800×600 JPEG with “SECRET 123-45-6789” → marked the text band → Redact: toast “1 image erased underneath”; saved; `pdfimages -png` of the saved file shows the band black *in the image itself*, text gone. Unit tests: Flate RGB with and without PNG predictor (only covered pixels zeroed, a second page sharing the image keeps the original), undecodable image → removed whole, images outside marks untouched. Confirm dialog no longer says images are only covered.
+
 ### Known gaps / next
-- Redaction does not yet erase pixels of images under the area (images are covered only; the confirm dialog says so). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
+- Redaction: inline images (BI…EI) aren't handled yet; JBIG2/CCITT images under a mark are removed whole. Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).

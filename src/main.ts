@@ -855,7 +855,7 @@ async function applyRedactionMarks() {
   const pageCount = doc.pdf.numPages;
   const ok = await showDialog({
     title: "Apply redactions?",
-    message: `Text and annotations in ${marks.length === 1 ? "the marked area" : `the ${marks.length} marked areas`} will be removed and blacked out. You can still undo until you close the file. Images under the areas are covered, not erased.`,
+    message: `Everything in ${marks.length === 1 ? "the marked area" : `the ${marks.length} marked areas`} — text, images and annotations — will be removed and blacked out. You can still undo until you close the file.`,
     body: el("div", { className: "stack" }, [
       ...(pageCount > 1 ? [el("label", { className: "chk-lg" }, [everyPage, `Apply the same areas to all ${pageCount} pages (repeated headers/footers)`])] : []),
       el("label", { className: "chk-lg" }, [scrub, "Also remove document properties (author, title, etc.)"]),
@@ -863,13 +863,19 @@ async function applyRedactionMarks() {
     buttons: [{ label: "Cancel", value: false }, { label: "Redact", value: true, primary: true, danger: true }],
   });
   if (!ok) return;
-  let glyphs = 0;
+  let glyphs = 0, images = 0, imagesRemoved = 0;
   const done = await mutatePages("Redacting", async (b) => {
     const r = await (await import("./redact")).applyRedactions(b, everyPage.checked ? expandToAllPages(marks, pageCount) : marks, { ...crypt(), scrubMetadata: scrub.checked });
-    glyphs = r.glyphs;
+    ({ glyphs, images, imagesRemoved } = r);
     return r.bytes;
   }, viewer.currentPageNumber, true);
-  if (done) { redact.clear(); toast(`Redacted ${marks.length} area${marks.length > 1 ? "s" : ""}${everyPage.checked ? ` on all ${pageCount} pages` : ""} (${glyphs} characters removed). Save to keep it.`); }
+  if (done) {
+    redact.clear();
+    const parts = [`${glyphs} character${glyphs === 1 ? "" : "s"} removed`];
+    if (images) parts.push(`${images} image${images === 1 ? "" : "s"} erased underneath`);
+    toast(`Redacted ${marks.length} area${marks.length > 1 ? "s" : ""}${everyPage.checked ? ` on all ${pageCount} pages` : ""} (${parts.join(", ")}). Save to keep it.`);
+    if (imagesRemoved) toast(`${imagesRemoved} image${imagesRemoved === 1 ? "" : "s"} under the marks couldn’t be edited, so ${imagesRemoved === 1 ? "it was" : "they were"} removed completely.`);
+  }
 }
 
 // ───────────────────────────── Navigation / zoom ─────────────────────────────
