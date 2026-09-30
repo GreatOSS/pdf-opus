@@ -222,7 +222,7 @@ export function setupEditText(ctx: Ctx) {
         pageIndex: idx,
         rect: [run.x - 0.5, run.y - run.size * 0.25, run.width + 1, run.size * 1.2],
         x: run.x, y: run.y, size: run.size, text, family, bold, italic, color: colors.fg, background: colors.bg,
-        align: isCentered ? "center" : "left",
+        align: isCentered ? "center" : "left", original: run.str,
       });
     };
     (box as any)._finish = finish;

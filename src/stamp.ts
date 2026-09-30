@@ -116,6 +116,8 @@ export interface TextEdit {
   background: [number, number, number];
   /** Keep centred text centred on the original run's midpoint. */
   align?: "left" | "center";
+  /** The text being replaced. When all its glyphs are removed from the page, nothing is painted over it. */
+  original?: string;
 }
 
 const FONT_FOR: Record<string, StandardFonts> = {
@@ -143,9 +145,11 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
       font = uni;
     }
     const [rx, ry, rw, rh] = e.rect;
-    // Remove the old glyphs for real (so search/copy no longer find them), then cover any remnants.
-    removeTextFromPage(doc, page, [e.rect]);
-    page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, color: rgb(...e.background) });
+    // Remove the old glyphs for real (so search/copy no longer find them). Only if some couldn't be
+    // found (ligatures, text we can't parse) cover the spot, which hides what's behind it (images, tints).
+    const removed = removeTextFromPage(doc, page, [e.rect]);
+    const glyphs = e.original === undefined ? Infinity : [...e.original].filter((c) => c.trim()).length;
+    if (removed < glyphs) page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, color: rgb(...e.background) });
     // Without the fallback font, standard fonts only cover WinAnsi; replace anything else rather than failing.
     const safe = font === uni ? e.text : [...e.text].map((ch) => (unsupportedChars(ch).length ? "?" : ch)).join("");
     const x = e.align === "center" ? rx + rw / 2 - font.widthOfTextAtSize(safe, e.size) / 2 : e.x;

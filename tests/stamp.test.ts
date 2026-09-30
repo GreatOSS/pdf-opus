@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFString, degrees } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream, degrees, rgb } from "@cantoo/pdf-lib";
 import { applyTextEdits, fixFreeTextAppearances, formatNumber, stampPages, visualToUser } from "../src/stamp";
 
 describe("visualToUser", () => {
@@ -62,6 +62,35 @@ describe("applyTextEdits", () => {
     expect(out.length).toBeLessThan(font.length / 4); // a subset, not the whole 760 KB font
     // ASCII-only edits keep using the standard fonts (no embedding).
     expect(await embedded(await applyTextEdits(await d.save(), [{ ...edit, text: "Lodz" }], { unicodeFont: async () => font }))).toBe(0);
+  });
+});
+
+describe("applyTextEdits: keeping the background", () => {
+  // Text on a tinted band: the edit should remove the old glyphs, not paint a box over the tint.
+  const tinted = async () => {
+    const d = await PDFDocument.create();
+    const page = d.addPage([600, 800]);
+    page.drawRectangle({ x: 0, y: 650, width: 600, height: 100, color: rgb(0.2, 0.4, 0.8) });
+    page.drawText("Old heading", { x: 50, y: 700, size: 20, font: await d.embedFont(StandardFonts.Helvetica) });
+    return d.save();
+  };
+  const edit = { pageIndex: 0, rect: [49.5, 695, 120, 24] as [number, number, number, number], x: 50, y: 700, size: 20, text: "New heading",
+    family: "sans" as const, bold: false, italic: false, color: [0, 0, 0] as [number, number, number], background: [0.2, 0.4, 0.8] as [number, number, number] };
+  const fills = async (bytes: Uint8Array) => {
+    const page = (await PDFDocument.load(bytes)).getPage(0);
+    const ctx = page.doc.context;
+    const refs = page.node.Contents() instanceof PDFArray ? (page.node.Contents() as PDFArray).asArray() : [page.node.get(PDFName.of("Contents"))];
+    const text = refs.map((r) => new TextDecoder("latin1").decode(decodePDFRawStream(ctx.lookup(r) as PDFRawStream).decode())).join("\n");
+    return text.split("0.2 0.4 0.8 rg").length - 1; // shapes filled with the tint
+  };
+  it("paints nothing over the spot when every old glyph was removed", async () => {
+    const src = await tinted();
+    const before = await fills(src);
+    expect(await fills(await applyTextEdits(src, [{ ...edit, original: "Old heading" }]))).toBe(before);
+  });
+  it("still covers the spot when the old text isn't known", async () => {
+    const src = await tinted();
+    expect(await fills(await applyTextEdits(src, [edit]))).toBeGreaterThan(await fills(src));
   });
 });
 

@@ -339,3 +339,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Tool hints on touch said “Click … (or press Enter)” | **Fixed:** say “Tap” on touch screens |
 | Flatten on phone: 199 fields flattened, note kept | OK |
 | **Found and fixed (all sizes):** a closed sidebar was only 0 px wide, so Tab and screen readers still reached its thumbnails/outline links | Closed sidebar is now `visibility: hidden` (after the collapse animation). Keyboard check: 0 Tab stops in it when closed, 14 when open. New e2e for small-screen jump + hidden state |
+
+## 2026-09-30 — Edit text keeps the background
+
+| Workflow | Result |
+|---|---|
+| Heading in white on a multi-colour striped banner → Edit text → “Annual Report 2026” | **Improved:** before, the old text was removed *and* a single-colour box painted over it, visible on gradients/images. Now the box is only drawn when some old glyphs couldn't be removed (ligatures, unparsed text). Screenshot: stripes intact, new text white; pdftotext shows only the new text; `qpdf --check` clean |
+| Unit: tint preserved when all glyphs removed; cover still drawn when the old text is unknown | OK. unit 76/76, e2e 84/84 |
