@@ -239,6 +239,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Crop pages
 - More → “Crop pages…”: trim white margins automatically (render at 0.75×, find non-white bounds, 9 pt padding) or custom margins in mm (as displayed; rotation-aware via the viewport), all or selected pages; sets CropBox (drops stale Trim/ArtBox); undoable. tracemonkey auto, all 14 pages: ~1.2 s, “Cropped 14 pages.”, pdfinfo p1 CropBox 44,58–566,724, render tight with text intact; Ctrl+Z restores full page; thumbnail 1 selected → dialog defaults to “Selected pages (1)” → custom 20 mm → p1 CropBox 56.69 pt in, p2 untouched. Dialog: margin fields hidden unless Custom is chosen (first version showed them greyed out). unit 55/55.
 
+### 2026-09-30 — Save pages as images
+- More → “Save pages as images…”: current/selected/all pages, PNG or JPEG, 96/150/300 dpi (capped at 8000 px per side); one page → image file, several → ZIP (own store-only writer, UTF-8 names); includes form entries/annotations; progress + Cancel. f1040 with typed “Zoë Imagetest”, current page, PNG 150 dpi → “f1040 - page 1.png” 1275×1650 with the value rendered. tracemonkey all pages, JPEG → “tracemonkey (images).zip” in 0.8 s; `unzip -t`: no errors; 14 files “tracemonkey - page 01.jpg” … valid 1275×1650 JPEGs. Opening another file with unsaved edits correctly asked “Discard unsaved changes?”. unit 57/57.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

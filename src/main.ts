@@ -127,6 +127,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miPrint">Print…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
   <button role="menuitem" id="miCrop">Crop pages…</button>
+  <button role="menuitem" id="miImages">Save pages as images…</button>
   <button role="menuitem" id="miStamp">Page numbers, headers & watermark…</button>
   <button role="menuitem" id="miCompress">Reduce file size…</button>
   <button role="menuitem" id="miOcr">Recognize text (OCR)…</button>
@@ -537,6 +538,51 @@ async function extractDialog() {
     toast(`Extracted ${idx.length} page${idx.length === 1 ? "" : "s"}`);
   } catch (e: any) { toast(e.message, "error"); }
 }
+async function imagesDialog() {
+  if (!doc) return;
+  const pdf = doc.pdf, n = pdf.numPages, base = doc.name.replace(/\.pdf$/i, "");
+  const sel = thumbs.selected();
+  const saved = JSON.parse(localStorage.getItem("leaflark.images") || "{}");
+  const select = (opts: [string, string][], value: string) => {
+    const s = el("select", { className: "text-input" }, opts.map(([v, t]) => el("option", { value: v, textContent: t }))) as HTMLSelectElement;
+    s.value = value;
+    return s;
+  };
+  const fmt = select([["png", "PNG — sharp text, larger files"], ["jpeg", "JPEG — photos and scans, smaller files"]], saved.fmt ?? "png");
+  const dpi = select([["96", "Screen (96 dpi)"], ["150", "Standard (150 dpi)"], ["300", "High (300 dpi)"]], String(saved.dpi ?? 150));
+  const scopeSel = sel.length > 0 && sel.length < n;
+  const scope = select([["all", `All ${n} pages`], ...(scopeSel ? [["sel", `Selected pages (${compressRanges(sel)})`] as [string, string]] : []), ["cur", `Current page (${viewer.currentPageNumber})`]], scopeSel ? "sel" : n === 1 ? "all" : "cur");
+  const row = (label: string, input: HTMLElement) => el("label", { className: "form-row" }, [el("span", { textContent: label }), input]);
+  const body = el("div", { className: "stamp-form" }, [row("Pages", scope), row("Format", fmt), row("Resolution", dpi),
+    el("p", { className: "hint-text", textContent: "One page downloads as an image; several are packed into a ZIP file. Form entries and annotations are included." })]);
+  const ok = await showDialog({ title: "Save pages as images", body, buttons: [{ label: "Cancel", value: false }, { label: "Save", value: true, primary: true }] });
+  if (!ok || !doc || doc.pdf !== pdf) return;
+  localStorage.setItem("leaflark.images", JSON.stringify({ fmt: fmt.value, dpi: +dpi.value }));
+  const pages = scope.value === "sel" ? sel.map((i) => i + 1) : scope.value === "cur" ? [viewer.currentPageNumber] : [...Array(n).keys()].map((i) => i + 1);
+  const ext = fmt.value === "png" ? "png" : "jpg";
+  const signal = { cancelled: false };
+  showLoading("Rendering pages…", () => { signal.cancelled = true; });
+  try {
+    const { renderPageImage, zip } = await import("./images");
+    const files: { name: string; data: Uint8Array }[] = [];
+    const pad = String(n).length;
+    for (const [k, p] of pages.entries()) {
+      if (signal.cancelled) return;
+      if (pages.length > 1) $("#loadingText").textContent = `Rendering page ${k + 1} of ${pages.length}…`;
+      files.push({ name: `${base} - page ${String(p).padStart(pad, "0")}.${ext}`, data: await renderPageImage(pdf, p, +dpi.value, fmt.value === "png" ? "image/png" : "image/jpeg") });
+    }
+    if (signal.cancelled) return;
+    const single = files.length === 1;
+    const out = single ? files[0].data : zip(files);
+    const a = el("a", { href: URL.createObjectURL(new Blob([out as BlobPart], { type: single ? `image/${fmt.value}` : "application/zip" })), download: single ? files[0].name : `${base} (images).zip` }) as HTMLAnchorElement;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+    toast(single ? `Saved page ${pages[0]} as ${ext.toUpperCase()}.` : `Saved ${files.length} pages as ${ext.toUpperCase()} images in a ZIP file.`);
+  } catch (e: any) {
+    toast(`Couldn’t save images: ${e?.message ?? e}`, "error");
+  } finally { hideLoading(); }
+}
+
 async function cropDialog() {
   if (!doc) return;
   const pdf = doc.pdf, n = pdf.numPages;
@@ -1442,6 +1488,7 @@ on("#miDarkPages", () => applyDarkPages(!document.body.classList.contains("dark-
 on("#miOpen", pickAndOpen);
 on("#miSaveAs", () => save(true));
 on("#miCrop", cropDialog);
+on("#miImages", imagesDialog);
 on("#miPresent", startPresentation);
 on("#miPrint", print);
 on("#miExtract", extractDialog);
