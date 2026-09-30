@@ -45,4 +45,4 @@ Leaflark has no server component, analytics or network calls beyond loading its 
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE). Leaflark bundles pdf.js (Apache-2.0), pdf-lib (MIT) the Great Vibes, Dancing Script and Caveat fonts (SIL OFL 1.1) DejaVu Sans (Bitstream Vera licence) — see `public/fonts` — and tesseract.js with English data (Apache-2.0).
+Apache-2.0. See [LICENSE](LICENSE). Leaflark bundles pdf.js (Apache-2.0), pdf-lib (MIT), tesseract.js with its English data (Apache-2.0), the Great Vibes, Dancing Script and Caveat fonts (SIL OFL 1.1) and DejaVu Sans (Bitstream Vera licence); font licences are in `public/fonts`.
