@@ -318,3 +318,41 @@ test("notes can be added and answered with the keyboard only", async ({ page }) 
   await expect(page.locator(".note-item .note-body").first()).toHaveText("Keyboard note");
   await expect(page.locator(".note-item .note-reply")).toContainText("Keyboard reply");
 });
+
+test("undo still works for page changes made after drawing", async ({ page }) => {
+  await open(page, 2);
+  await page.locator("#viewerContainer").focus();
+  await page.keyboard.press("d");
+  const pb = (await page.locator('.page[data-page-number="1"]').boundingBox())!;
+  await page.mouse.move(pb.x + 200, pb.y + 200);
+  await page.mouse.down();
+  for (let i = 0; i < 8; i++) await page.mouse.move(pb.x + 200 + i * 15, pb.y + 200 + (i % 2) * 20);
+  await page.mouse.up();
+  await page.keyboard.press("Escape");
+  await page.locator("#thumbs [role=option]").first().click();
+  await page.locator("#pgRotR").click();
+  const rot = () => page.evaluate(async () => (await (window as any).leaflark.doc.pdf.getPage(1)).rotate);
+  await expect.poll(rot).toBe(90);
+  await page.locator("#btnUndo").click();
+  await expect.poll(rot).toBe(0);
+});
+
+test("flattens form fields and annotations, keeping notes", async ({ page }) => {
+  const d = await PDFDocument.create();
+  const p = d.addPage([612, 792]);
+  const tf = d.getForm().createTextField("name");
+  tf.setText("Flat value");
+  tf.addToPage(p, { x: 72, y: 700, width: 200, height: 24 });
+  await page.goto("/");
+  await page.locator("#fileInput").setInputFiles({ name: "form.pdf", mimeType: "application/pdf", buffer: Buffer.from(await d.save()) });
+  await expect(page.locator(".annotationLayer input")).toHaveCount(1);
+  await page.locator("#btnMore").click();
+  await page.locator("#miFlatten").click();
+  await page.locator("dialog").getByRole("button", { name: "Flatten" }).click();
+  await expect(page.locator("#toasts")).toContainText("Flattened 1 form field");
+  await expect(page.locator(".annotationLayer input")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(async () => {
+    const pg = await (window as any).leaflark.doc.pdf.getPage(1);
+    return (await pg.getTextContent()).items.map((i: any) => i.str).join(" ");
+  })).toContain("Flat value");
+});

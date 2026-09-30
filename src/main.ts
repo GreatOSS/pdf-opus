@@ -138,6 +138,7 @@ $("#app").innerHTML = `
   <hr />
   <button role="menuitem" id="miCompress">Reduce file size…</button>
   <button role="menuitem" id="miOcr">Recognize text (OCR)…</button>
+  <button role="menuitem" id="miFlatten">Flatten forms & annotations…</button>
   <hr />
   <button role="menuitem" id="miPresent">Present</button>
   <button role="menuitem" id="miSpread">Two-page view</button>
@@ -240,6 +241,8 @@ async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | n
   doc = { pdf, bytes, name, handle, dirty: !!opts.dirty, password };
   redact.clear(); // marks refer to the previous page layout
   (pdf.annotationStorage as any).onSetModified = () => setDirty(true);
+  // pdf.js's own undo history belonged to the previous document (its edits are now in `bytes`).
+  editorState = { hasSomethingToUndo: false, hasSomethingToRedo: false };
   viewer.setDocument(pdf);
   linkService.setDocument(pdf, null);
   findController.setDocument?.(pdf);
@@ -1179,6 +1182,30 @@ async function compressDialog() {
   else toast(`This file is already compact — nothing worth shrinking (${mb(r.before)}).`);
 }
 
+/** Draw form entries and annotations into the pages so recipients can't change them. */
+async function flattenDialog() {
+  if (!doc) return;
+  const ok = await showDialog({
+    title: "Flatten forms & annotations",
+    message: "Form entries, highlights, drawings, text boxes and signatures become part of the page: they look the same everywhere but can no longer be edited or removed. Sticky notes and links are kept. You can undo this.",
+    buttons: [{ label: "Cancel", value: false }, { label: "Flatten", value: true, primary: true }],
+  });
+  if (!ok) return;
+  let res: { flattened: number; fields: number; skipped: number } | null = null;
+  const done = await mutatePages("Flattening", async (b) => {
+    const r = await (await import("./flatten")).flatten(b, crypt());
+    res = r;
+    if (!r.flattened && !r.fields) throw new Unchanged();
+    return r.bytes;
+  }, viewer.currentPageNumber, true);
+  const r = res as { flattened: number; fields: number; skipped: number } | null;
+  if (!r) return;
+  const n = (k: number, w: string) => `${k} ${w}${k === 1 ? "" : "s"}`;
+  if (!done) { toast("There are no form fields or annotations to flatten."); return; }
+  const parts = [r.fields && n(r.fields, "form field"), r.flattened && n(r.flattened, "annotation")].filter(Boolean).join(" and ");
+  toast(`Flattened ${parts}.${r.skipped ? ` ${n(r.skipped, "item")} without a stored appearance ${r.skipped === 1 ? "was" : "were"} left as ${r.skipped === 1 ? "is" : "they are"}.` : ""} Save to keep it.`);
+}
+
 /** Make scanned pages searchable: recognise their text and add it as an invisible layer. */
 async function ocrDialog() {
   if (!doc) return;
@@ -1696,6 +1723,7 @@ on("#miProps", showProperties);
 on("#miStamp", stampDialog);
 on("#miCompress", compressDialog);
 on("#miOcr", ocrDialog);
+on("#miFlatten", flattenDialog);
 on("#miShortcuts", showShortcuts);
 on("#miClose", closeDocument);
 on("#pgRotL", () => rotatePages(thumbs.selected(), -90));
