@@ -1,0 +1,86 @@
+diff --git a/node_modules/@cantoo/pdf-lib/cjs/core/parser/PDFObjectParser.js b/node_modules/@cantoo/pdf-lib/cjs/core/parser/PDFObjectParser.js
+index 1128a45..816679f 100644
+--- a/node_modules/@cantoo/pdf-lib/cjs/core/parser/PDFObjectParser.js
++++ b/node_modules/@cantoo/pdf-lib/cjs/core/parser/PDFObjectParser.js
+@@ -189,7 +189,14 @@ class PDFObjectParser extends BaseParser_1.default {
+         }
+         const start = this.bytes.offset();
+         let end;
+-        const Length = dict.get(PDFName_1.default.of('Length'));
++        let Length = dict.get(PDFName_1.default.of('Length'));
++        // Leaflark patch: resolve an indirect /Length instead of guessing the end from the next
++        // "endstream" (which trims a final CR/LF that belongs to the data and corrupts the stream).
++        if (Length instanceof PDFRef_1.default) {
++            const known = this.context.lookup(Length);
++            const n = known instanceof PDFNumber_1.default ? known.asNumber() : indirectLengths(this.bytes).get(Length.objectNumber + ' ' + Length.generationNumber);
++            if (n !== undefined) Length = PDFNumber_1.default.of(n);
++        }
+         if (Length instanceof PDFNumber_1.default) {
+             end = start + Length.asNumber();
+             this.bytes.moveTo(end);
+@@ -235,6 +242,22 @@ class PDFObjectParser extends BaseParser_1.default {
+         return end;
+     }
+ }
++
++// Leaflark patch: "N G obj <integer> endobj" values in the file, indexed once per file (for indirect /Length).
++const lengthIndex = new WeakMap();
++function indirectLengths(byteStream) {
++    const raw = byteStream.bytes;
++    let map = lengthIndex.get(raw);
++    if (!map) {
++        map = new Map();
++        const text = new TextDecoder('latin1').decode(raw);
++        const re = /(?:^|[^0-9])(\d+)\s+(\d+)\s+obj\s*(\d+)\s*endobj/g;
++        let m;
++        while ((m = re.exec(text))) map.set(m[1] + ' ' + m[2], Number(m[3]));
++        lengthIndex.set(raw, map);
++    }
++    return map;
++}
+ PDFObjectParser.forBytes = (bytes, context, capNumbers) => new PDFObjectParser(ByteStream_1.default.of(bytes), context, capNumbers);
+ PDFObjectParser.forByteStream = (byteStream, context, capNumbers = false) => new PDFObjectParser(byteStream, context, capNumbers);
+ exports.default = PDFObjectParser;
+diff --git a/node_modules/@cantoo/pdf-lib/es/core/parser/PDFObjectParser.js b/node_modules/@cantoo/pdf-lib/es/core/parser/PDFObjectParser.js
+index 2818a5b..ca59079 100644
+--- a/node_modules/@cantoo/pdf-lib/es/core/parser/PDFObjectParser.js
++++ b/node_modules/@cantoo/pdf-lib/es/core/parser/PDFObjectParser.js
+@@ -186,7 +186,14 @@ class PDFObjectParser extends BaseParser {
+         }
+         const start = this.bytes.offset();
+         let end;
+-        const Length = dict.get(PDFName.of('Length'));
++        let Length = dict.get(PDFName.of('Length'));
++        // Leaflark patch: resolve an indirect /Length instead of guessing the end from the next
++        // "endstream" (which trims a final CR/LF that belongs to the data and corrupts the stream).
++        if (Length instanceof PDFRef) {
++            const known = this.context.lookup(Length);
++            const n = known instanceof PDFNumber ? known.asNumber() : indirectLengths(this.bytes).get(Length.objectNumber + ' ' + Length.generationNumber);
++            if (n !== undefined) Length = PDFNumber.of(n);
++        }
+         if (Length instanceof PDFNumber) {
+             end = start + Length.asNumber();
+             this.bytes.moveTo(end);
+@@ -232,6 +239,22 @@ class PDFObjectParser extends BaseParser {
+         return end;
+     }
+ }
++
++// Leaflark patch: "N G obj <integer> endobj" values in the file, indexed once per file (for indirect /Length).
++const lengthIndex = new WeakMap();
++function indirectLengths(byteStream) {
++    const raw = byteStream.bytes;
++    let map = lengthIndex.get(raw);
++    if (!map) {
++        map = new Map();
++        const text = new TextDecoder('latin1').decode(raw);
++        const re = /(?:^|[^0-9])(\d+)\s+(\d+)\s+obj\s*(\d+)\s*endobj/g;
++        let m;
++        while ((m = re.exec(text))) map.set(m[1] + ' ' + m[2], Number(m[3]));
++        lengthIndex.set(raw, map);
++    }
++    return map;
++}
+ PDFObjectParser.forBytes = (bytes, context, capNumbers) => new PDFObjectParser(ByteStream.of(bytes), context, capNumbers);
+ PDFObjectParser.forByteStream = (byteStream, context, capNumbers = false) => new PDFObjectParser(byteStream, context, capNumbers);
+ export default PDFObjectParser;
