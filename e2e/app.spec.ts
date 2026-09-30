@@ -209,3 +209,16 @@ test("ships a Content-Security-Policy that keeps files on the device", async ({ 
   expect(csp).toContain("object-src 'none'");
   expect(csp).not.toContain("'unsafe-eval'"); // 'wasm-unsafe-eval' is fine
 });
+
+test("presentation can be left by touch @mobile", async ({ page }) => {
+  await open(page);
+  await expect(page.locator(".toolbar #btnSave")).toBeVisible();
+  await page.locator("#btnMore").click();
+  await page.locator("#miPresent").click();
+  await expect(page.locator("#presentExit")).toBeVisible();
+  await page.locator("#viewerContainer").click({ position: { x: 300, y: 300 } });
+  await expect(page.locator(".page-input")).toHaveValue("2");
+  await page.locator("#presentExit").click();
+  await expect(page.locator("body")).not.toHaveClass(/presenting/);
+  await expect(page.locator("#presentExit")).toBeHidden();
+});

@@ -1421,7 +1421,9 @@ async function startPresentation() {
   // Not available everywhere (e.g. iPhone Safari): the in-window view still works there.
   try { await document.documentElement.requestFullscreen?.({ navigationUI: "hide" }); } catch { /* stay in the window */ }
   container.focus();
-  toast("Presenting — use the arrow keys or click to move, Esc to exit.");
+  toast(matchMedia("(pointer: coarse)").matches
+    ? "Presenting — tap or swipe to move, × to exit."
+    : "Presenting — use the arrow keys or click to move, Esc to exit.");
 }
 function stopPresentation() {
   if (!presenting) return;
@@ -1436,9 +1438,22 @@ function stopPresentation() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) stopPresentation(); });
+// Touch devices may have no Esc key and (iPhone) no full-screen API, so there is always a visible way out.
+const presentExit = el("button", { id: "presentExit", className: "present-exit", type: "button", ariaLabel: "Exit presentation", title: "Exit presentation (Esc)", innerHTML: icons.close }) as HTMLButtonElement;
+presentExit.onclick = stopPresentation;
+document.body.append(presentExit);
+// Click/tap: left third goes back, elsewhere forward. Horizontal swipes turn pages too.
+let swipeX: number | null = null, swiped = false;
+container.addEventListener("pointerdown", (e) => { if (presenting) { swipeX = e.clientX; swiped = false; } });
+container.addEventListener("pointerup", (e) => {
+  if (!presenting || swipeX === null) return;
+  const dx = e.clientX - swipeX;
+  swipeX = null;
+  if (Math.abs(dx) > 50) { swiped = true; dx < 0 ? viewer.nextPage() : viewer.previousPage(); }
+});
 container.addEventListener("click", (e) => {
-  if (!presenting || (e.target as HTMLElement).closest("a, input, textarea, select, button")) return;
-  e.shiftKey ? viewer.previousPage() : viewer.nextPage();
+  if (!presenting || swiped || (e.target as HTMLElement).closest("a, input, textarea, select, button")) return;
+  e.shiftKey || e.clientX < container.clientWidth / 3 ? viewer.previousPage() : viewer.nextPage();
 });
 window.addEventListener("keydown", (e) => {
   if (!presenting || document.querySelector("dialog[open]")) return;
