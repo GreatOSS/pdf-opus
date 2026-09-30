@@ -13,3 +13,4 @@ Leaflark's baseline answers the first three by design (free, local, unlimited, n
 6. End-to-end tests (Playwright) for the workflows in docs/TESTING.md; run in CI.
 7. ~~Recent files list (IndexedDB, opt-in)~~ (done 2026-09-30), ~~presentation mode~~ (done 2026-09-30), ~~print cross-browser~~ (done 2026-09-30: pages rendered to images instead of the browser’s PDF viewer).
 8. Desktop packaging (Tauri) for native file association — local builds only while the repo is private.
+9. Comments / sticky notes (pdf.js 6 has comment support via enableComment + a comment manager UI).

@@ -112,7 +112,8 @@ $("#app").innerHTML = `
         <h1>${APP_NAME}</h1>
         <p>View, annotate, fill, sign and reorganize PDFs.<br />Your files never leave this device.</p>
         <button id="welcomeOpen" class="primary-btn big" type="button">${icons.open}<span>Open a PDF</span></button>
-        <p class="hint">or drop PDFs or images anywhere · ${mod}O<br />Drop several files to combine them</p>
+        <p class="hint hint-pointer">or drop PDFs or images anywhere · ${mod}O<br />Drop several files to combine them</p>
+        <p class="hint hint-touch">Pick several files at once to combine them</p>
         <div id="recent" class="recent" hidden><h2>Recent</h2><ul id="recentList" class="recent-list"></ul></div>
         <label class="chk recent-opt"><input type="checkbox" id="recentOn" />Remember recent files on this device</label>
       </div>

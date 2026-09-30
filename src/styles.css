@@ -287,3 +287,7 @@ body.presenting .present-exit svg { width: 20px; height: 20px; }
 
 /* Dark pages (night reading): recolour the page display only — hue-rotate keeps colours recognisable. */
 body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }
+
+/* Welcome hints: drag-and-drop and shortcuts mean nothing on touch-only devices. */
+.hint-touch { display: none; }
+@media (pointer: coarse) and (hover: none) { .hint-pointer { display: none; } .hint-touch { display: block; } }

@@ -251,6 +251,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Performance: 800-page document
 - Production build, big800.pdf (1.9 MB): first page rendered ~1.0 s; 800 thumbnail slots, only visible ones rendered (5); jump to p700 146 ms; no long tasks; JS heap ~20 MB; 4 page canvases alive. Found: searching from p700 showed “No matches” for ~0.5 s before the first hit — running count updates with 0 matches were treated as final. Now shows “Searching…” until pdf.js reports NOT_FOUND. Re-test: “Page” → Searching… → 27961 of 32000+; “zebraxyz” → No matches.
 
+### 2026-09-30 — Welcome hint on touch devices
+- Phones were told to “drop PDFs … anywhere · Ctrl+O”. Touch-only devices (pointer: coarse, no hover) now see “Pick several files at once to combine them” instead. Verified: 390×844 touch → touch hint only; 1280×800 desktop → drop/shortcut hint only. Roadmap: comments/sticky notes noted as item 9 (pdf.js 6 comment support needs its comment manager UI).
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
