@@ -432,6 +432,30 @@ test("on small screens, jumping to a bookmark closes the sidebar that covers the
   await expect(page.getByText("Appendix")).toBeHidden(); // and out of the Tab order
 });
 
+test("edits a whole paragraph, rewrapping it", async ({ page }) => {
+  const d = await PDFDocument.create();
+  const pg = d.addPage([612, 792]);
+  const f = await d.embedFont(StandardFonts.TimesRoman);
+  ["Thank you for your letter of 12 September. We have reviewed the", "documents you sent and are happy to confirm that the contract will", "start on 1 October as planned."].forEach((l, i) => pg.drawText(l, { x: 72, y: 700 - i * 16, size: 12, font: f }));
+  pg.drawText("Kind regards,", { x: 72, y: 620, size: 12, font: f });
+  await page.goto("/");
+  await page.locator("#fileInput").setInputFiles({ name: "letter.pdf", mimeType: "application/pdf", buffer: Buffer.from(await d.save()) });
+  await page.waitForSelector(".page canvas");
+  await page.keyboard.press("e");
+  const b = (await page.locator(".textLayer span", { hasText: "documents you sent" }).boundingBox())!;
+  await page.mouse.click(b.x + 20, b.y + b.height / 2);
+  await expect(page.locator(".edit-box")).toHaveText(/^Thank you .* as planned\.$/);
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("We confirm that the contract starts on 1 October as planned.");
+  await page.keyboard.press("Shift+Enter");
+  await page.keyboard.type("Please sign one copy.");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(async () => {
+    const p = await (window as any).leaflark.doc.pdf.getPage(1);
+    return (await p.getTextContent()).items.filter((i: any) => i.str.trim()).map((i: any) => `${Math.round(i.transform[5])} ${i.str}`).sort().reverse();
+  })).toEqual(["700 We confirm that the contract starts on 1 October as planned.", "684 Please sign one copy.", "620 Kind regards,"]);
+});
+
 test("uses the document's printed page numbers", async ({ page }) => {
   const d = await PDFDocument.create();
   for (let i = 0; i < 7; i++) d.addPage([300, 400]);

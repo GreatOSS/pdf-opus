@@ -374,3 +374,15 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 |---|---|
 | Bookmark ⋮ menu (disabled items, key hints), note dialog with reply box and name field, Notes list, Split dialog — all in dark mode | OK, readable, consistent contrast |
 | Split dialog read “Every 1 pages” | **Fixed:** “Every 1 page” / “Every 2 pages” |
+
+## 2026-09-30 — Edit text: whole paragraphs
+
+| Workflow | Result |
+|---|---|
+| Letter (Times 12 pt, 3-line paragraph): hover highlights the paragraph; click → one box over the three lines, exactly aligned; retype longer text + Shift+Enter line break → Enter | OK — rewrapped to the column in 4 lines with the original spacing, break kept; pdftotext shows the new text only |
+| tracemonkey abstract (justified, hyphenated, two columns): click a line → whole abstract (13 lines) opens, right column untouched | OK. **Fixed while testing:** words hyphenated at line ends showed as “com-pile” — now rejoined (lowercase-hyphen-lowercase only) |
+| Lengthen the abstract so it reaches the heading below | Warning toast: runs into the text below, shorten or undo |
+| Lines mixing fonts (a bold word mid-line), other sizes, uneven spacing | Stay single-line edits (unit tests) |
+| Outputs | `qpdf --check` and Ghostscript clean. unit 81/81, e2e 87/87 (new paragraph e2e in all browsers) |
+
+Known limits: rewrapped paragraphs are left-aligned (justification not kept); text in other fonts than the standard 14 is replaced with the closest standard font.

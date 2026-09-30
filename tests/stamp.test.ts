@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream, degrees, rgb } from "@cantoo/pdf-lib";
-import { applyTextEdits, fixFreeTextAppearances, formatNumber, stampPages, visualToUser } from "../src/stamp";
+import { applyTextEdits, fixFreeTextAppearances, formatNumber, stampPages, visualToUser, wrapText } from "../src/stamp";
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 
 describe("visualToUser", () => {
   const box: [number, number, number, number] = [0, 0, 600, 800];
@@ -62,6 +63,29 @@ describe("applyTextEdits", () => {
     expect(out.length).toBeLessThan(font.length / 4); // a subset, not the whole 760 KB font
     // ASCII-only edits keep using the standard fonts (no embedding).
     expect(await embedded(await applyTextEdits(await d.save(), [{ ...edit, text: "Lodz" }], { unicodeFont: async () => font }))).toBe(0);
+  });
+});
+
+describe("wrapText", () => {
+  const m = (s: string) => s.length; // one unit per character
+  it("wraps greedily, honours line breaks and the first-line indent", () => {
+    expect(wrapText("aa bb cc dd", m, 5)).toEqual(["aa bb", "cc dd"]);
+    expect(wrapText("aa bb cc", m, 5, 2)).toEqual(["aa", "bb cc"]);
+    expect(wrapText("aa\nbb cc", m, 10)).toEqual(["aa", "bb cc"]);
+    expect(wrapText("abcdefghij", m, 4)).toEqual(["abcd", "efgh", "ij"]);
+  });
+  it("writes a paragraph as wrapped lines", async () => {
+    const d = await PDFDocument.create();
+    d.addPage([600, 800]);
+    const out = await applyTextEdits(await d.save(), [{
+      pageIndex: 0, rect: [50, 660, 200, 50], x: 50, y: 700, size: 12, text: "The quick brown fox jumps over the lazy dog again and again",
+      family: "sans", bold: false, italic: false, color: [0, 0, 0], background: [1, 1, 1], wrap: { width: 150, lineHeight: 14 },
+    }]);
+    const pdf = await pdfjs.getDocument({ data: out.slice() }).promise;
+    const items = (await (await pdf.getPage(1)).getTextContent()).items.filter((i: any) => i.str.trim());
+    const ys = [...new Set(items.map((i: any) => Math.round(i.transform[5])))];
+    expect(ys).toEqual([700, 686, 672]);
+    expect(Math.max(...items.map((i: any) => i.transform[4] + i.width))).toBeLessThanOrEqual(200.5);
   });
 });
 

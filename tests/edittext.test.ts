@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fontStyle, groupRuns, looksCentered, unsupportedChars } from "../src/edittext";
+import { fontStyle, groupRuns, joinLines, looksCentered, paragraphOf, unsupportedChars } from "../src/edittext";
 
 const item = (str: string, x: number, y: number, width: number, size = 10, fontName = "f1") => ({ str, transform: [size, 0, 0, size, x, y], width, fontName });
 
@@ -51,5 +51,32 @@ describe("fontStyle", () => {
     expect(fontStyle("Roboto-Medium").bold).toBe(false);
     expect(fontStyle("NimbusRomNo9L-Regu")).toEqual({ bold: false, italic: false });
     expect(fontStyle("Whatever", { bold: true }).bold).toBe(true);
+  });
+});
+
+describe("paragraphOf", () => {
+  const run = (str: string, x: number, y: number, width: number, size = 10, fontName = "f1") => ({ str, x, y, width, size, fontName });
+  // Indented first line, full lines, short last line; then a new paragraph; a second column alongside.
+  const lines = [
+    run("First line of a paragraph", 70, 700, 230), run("continues on the next line", 54, 688, 246), run("and ends here.", 54, 676, 120),
+    run("Next paragraph starts", 70, 664, 230), run("and goes on.", 54, 652, 100),
+    run("Right column text", 320, 700, 240), run("more right column", 320, 688, 240),
+  ];
+  it("finds the paragraph around a clicked line", () => {
+    expect(paragraphOf(lines[1], lines).map((u) => u.str)).toEqual(["First line of a paragraph", "continues on the next line", "and ends here."]);
+    expect(paragraphOf(lines[4], lines).map((u) => u.str)).toEqual(["Next paragraph starts", "and goes on."]);
+    expect(paragraphOf(lines[5], lines).map((u) => u.str)).toEqual(["Right column text", "more right column"]);
+  });
+  it("stays on one line for mixed fonts, other sizes and uneven spacing", () => {
+    const bold = [run("A heading", 54, 720, 90, 10, "bold"), run("Body line with", 54, 700, 100), run("bold", 157, 700, 20, 10, "bold"), run("word", 180, 700, 30)];
+    expect(paragraphOf(bold[1], bold)).toHaveLength(1);
+    const sizes = [run("Big", 54, 720, 90, 14), run("small", 54, 706, 90)];
+    expect(paragraphOf(sizes[1], sizes)).toHaveLength(1);
+    const uneven = [run("one", 54, 700, 200), run("two", 54, 688, 200), run("far", 54, 672, 200)];
+    expect(paragraphOf(uneven[0], uneven).map((u) => u.str)).toEqual(["one", "two"]);
+  });
+  it("joins lines, rejoining hyphenated words", () => {
+    expect(joinLines(["more difficult to com-", "pile than ", " others"])).toBe("more difficult to compile than others");
+    expect(joinLines(["the Java-", "Script engine"])).toBe("the Java-Script engine");
   });
 });

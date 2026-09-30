@@ -118,6 +118,31 @@ export interface TextEdit {
   align?: "left" | "center";
   /** The text being replaced. When all its glyphs are removed from the page, nothing is painted over it. */
   original?: string;
+  /** A paragraph: wrap the text to this width (first line indented by `indent`), lines `lineHeight` apart. */
+  wrap?: { width: number; lineHeight: number; indent?: number };
+}
+
+/** Greedy word wrap; "\n" forces a break, words wider than a line are broken by character. */
+export function wrapText(text: string, measure: (s: string) => number, width: number, indent = 0): string[] {
+  const out: string[] = [];
+  for (const para of text.split("\n")) {
+    let line = "";
+    const room = () => width - (out.length === 0 ? indent : 0);
+    for (const word of para.split(/ +/).filter(Boolean)) {
+      const tryLine = line ? `${line} ${word}` : word;
+      if (measure(tryLine) <= room()) { line = tryLine; continue; }
+      if (line) { out.push(line); line = ""; }
+      let w = word;
+      while (measure(w) > room() && w.length > 1) {
+        let n = w.length - 1;
+        while (n > 1 && measure(w.slice(0, n)) > room()) n--;
+        out.push(w.slice(0, n)); w = w.slice(n);
+      }
+      line = w;
+    }
+    out.push(line);
+  }
+  return out;
 }
 
 const FONT_FOR: Record<string, StandardFonts> = {
@@ -152,6 +177,13 @@ export async function applyTextEdits(bytes: Uint8Array, edits: TextEdit[], { pas
     if (removed < glyphs) page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, color: rgb(...e.background) });
     // Without the fallback font, standard fonts only cover WinAnsi; replace anything else rather than failing.
     const safe = font === uni ? e.text : [...e.text].map((ch) => (unsupportedChars(ch).length ? "?" : ch)).join("");
+    if (e.wrap) {
+      const { width, lineHeight, indent = 0 } = e.wrap;
+      wrapText(safe, (t) => font.widthOfTextAtSize(t, e.size), width, indent).forEach((line, i) => {
+        if (line.trim()) page.drawText(line, { x: e.x + (i === 0 ? indent : 0), y: e.y - i * lineHeight, size: e.size, font, color: rgb(...e.color) });
+      });
+      continue;
+    }
     const x = e.align === "center" ? rx + rw / 2 - font.widthOfTextAtSize(safe, e.size) / 2 : e.x;
     if (safe.trim()) page.drawText(safe, { x, y: e.y, size: e.size, font, color: rgb(...e.color) });
   }

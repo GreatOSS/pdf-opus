@@ -4,5 +4,5 @@ const WIN_ANSI_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—�
 export const unsupportedChars = (text: string) =>
   [...new Set([...text].filter((ch) => {
     const c = ch.codePointAt(0)!;
-    return !((c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || WIN_ANSI_EXTRA.includes(ch));
+    return ch !== "\n" && !((c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || WIN_ANSI_EXTRA.includes(ch));
   }))];

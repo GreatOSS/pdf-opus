@@ -43,6 +43,56 @@ export function groupRuns(items: any[]): Run[] {
   return runs;
 }
 
+/**
+ * The lines of the paragraph that contains `run`, top to bottom: same font and size, evenly spaced
+ * baselines, a shared left edge (the first line may be indented), nothing else on those lines (a
+ * bold word mid-line ends the paragraph there). A paragraph ends after a short line or before an
+ * indented one. Returns just [run] when it stands alone.
+ */
+export function paragraphOf(run: Run, runs: Run[]): Run[] {
+  const s = run.size;
+  const alone = (u: Run) => !runs.some((v) => v !== u && Math.abs(v.y - u.y) < s * 0.3 && v.x < u.x + u.width + s * 2 && v.x + v.width > u.x - s * 2);
+  if (!alone(run)) return [run];
+  const fits = (u: Run) => u.fontName === run.fontName && Math.abs(u.size - s) < 0.5 && Math.abs(u.x - run.x) <= s * 3 && alone(u);
+  let gap = 0;
+  const step = (from: Run, dir: 1 | -1) => {
+    const c = runs.filter((u) => fits(u) && (u.y - from.y) * dir > s * 0.9 && (u.y - from.y) * dir < s * 1.8)
+      .sort((a, b) => Math.abs(a.y - from.y) - Math.abs(b.y - from.y))[0];
+    if (!c) return null;
+    const d = Math.abs(c.y - from.y);
+    if (gap && Math.abs(d - gap) > s * 0.2) return null;
+    gap ||= d;
+    return c;
+  };
+  const block = [run];
+  for (let u = step(run, 1); u; u = step(u, 1)) block.unshift(u);
+  for (let u = step(run, -1); u; u = step(u, -1)) block.push(u);
+  if (block.length < 2) return [run];
+  const left = Math.min(...block.map((u) => u.x));
+  const right = Math.max(...block.map((u) => u.x + u.width));
+  // Split the block into paragraphs; keep the one holding the clicked run.
+  let start = 0;
+  for (let i = 1; i <= block.length; i++) {
+    const breaks = i === block.length || block[i].x - left > s * 0.5 || block[i - 1].x + block[i - 1].width < right - s * 2.5;
+    if (!breaks) continue;
+    const para = block.slice(start, i);
+    if (para.includes(run)) return para;
+    start = i;
+  }
+  return [run];
+}
+
+/**
+ * A paragraph's lines as one string for editing. A word hyphenated across lines ("com-" + "pile") is
+ * rejoined, since the text will wrap differently; other line-end hyphens stay, without a space.
+ */
+export function joinLines(lines: string[]): string {
+  return lines.map((l) => l.trim()).reduce((acc, l) => {
+    if (!acc) return l;
+    if (/\p{Ll}-$/u.test(acc) && /^\p{Ll}/u.test(l)) return acc.slice(0, -1) + l;
+    return acc.endsWith("-") ? acc + l : `${acc} ${l}`;
+  }, "");
+}
 
 /**
  * Is this run centred? True when it is indented from the text block's left edge and the gaps on
@@ -122,12 +172,16 @@ export function setupEditText(ctx: Ctx) {
     const [px, py] = view.viewport.convertToPdfPoint(e.clientX - r.left - pageEl.clientLeft, e.clientY - r.top - pageEl.clientTop);
     const { runs, styles, page } = await runsFor(idx);
     const run = runs.find((u) => px >= u.x - 1 && px <= u.x + u.width + 1 && py >= u.y - u.size * 0.25 && py <= u.y + u.size * 0.95);
-    return run ? { run, runs, styles, page, pageEl, view, idx } : null;
+    if (!run) return null;
+    const para = looksCentered(run, runs, page.view as number[]) ? [run] : paragraphOf(run, runs);
+    return { run, para, runs, styles, page, pageEl, view, idx };
   };
 
-  const cssRectOf = (view: any, run: Run) => {
-    const [x1, y1] = view.viewport.convertToViewportPoint(run.x, run.y - run.size * 0.25);
-    const [x2, y2] = view.viewport.convertToViewportPoint(run.x + run.width, run.y + run.size * 0.95);
+  const cssRectOf = (view: any, run: Run, para: Run[] = [run]) => {
+    const last = para[para.length - 1], first = para[0];
+    const x0 = Math.min(...para.map((u) => u.x)), x1_ = Math.max(...para.map((u) => u.x + u.width));
+    const [x1, y1] = view.viewport.convertToViewportPoint(x0, last.y - run.size * 0.25);
+    const [x2, y2] = view.viewport.convertToViewportPoint(x1_, first.y + run.size * 0.95);
     return { left: Math.min(x1, x2), top: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
   };
 
@@ -138,7 +192,7 @@ export function setupEditText(ctx: Ctx) {
     const hit = await locate(e);
     if (seq !== hoverSeq) return;
     if (!hit) { hover.remove(); return; }
-    const r = cssRectOf(hit.view, hit.run);
+    const r = cssRectOf(hit.view, hit.run, hit.para);
     Object.assign(hover.style, { left: `${r.left - 2}px`, top: `${r.top - 1}px`, width: `${r.width + 4}px`, height: `${r.height + 2}px` });
     if (hover.parentElement !== hit.pageEl) hit.pageEl.append(hover);
   });
@@ -155,7 +209,7 @@ export function setupEditText(ctx: Ctx) {
 
   function open(hit: NonNullable<Awaited<ReturnType<typeof locate>>>) {
     hover.remove();
-    const { run, styles, page, pageEl, view, idx } = hit;
+    const { run, para, styles, page, pageEl, view, idx } = hit;
     const r = cssRectOf(view, run);
     const canvas = pageEl.querySelector("canvas") as HTMLCanvasElement | null;
     const colors = canvas ? sampleColors(canvas, r, pageEl.clientWidth) : { bg: [1, 1, 1] as [number, number, number], fg: [0, 0, 0] as [number, number, number] };
@@ -172,17 +226,29 @@ export function setupEditText(ctx: Ctx) {
     if (isCentered) { box.style.textAlign = "center"; }
     box.contentEditable = "plaintext-only";
     box.spellcheck = true;
-    box.textContent = run.str;
+    const multi = para.length > 1;
+    const left = Math.min(...para.map((u) => u.x));
+    const colWidth = Math.max(...para.map((u) => u.x + u.width)) - left;
+    const lineGap = multi ? (para[0].y - para[para.length - 1].y) / (para.length - 1) : run.size * 1.2;
+    const indent = multi ? Math.max(0, para[0].x - left) : 0;
+    const original = multi ? joinLines(para.map((u) => u.str)) : run.str;
+    box.textContent = original;
     const rgbCss = (c: number[]) => `rgb(${c.map((v) => Math.round(v * 255)).join(",")})`;
     // Lay the box out in the text's own frame and turn it with the page: its top-left corner is the
     // run's top-left in PDF space; on rotated pages that corner lands elsewhere on screen.
     const vp = view.viewport;
-    const [ox, oy] = vp.convertToViewportPoint(run.x, run.y + run.size * 0.95);
-    const [ux, uy] = vp.convertToViewportPoint(run.x + 1, run.y + run.size * 0.95);
+    const top = multi ? para[0].y + run.size * 0.95 - (lineGap - run.size * 1.2) / 2 : run.y + run.size * 0.95;
+    const [ox, oy] = vp.convertToViewportPoint(multi ? left : run.x, top);
+    const [ux, uy] = vp.convertToViewportPoint((multi ? left : run.x) + 1, top);
     const k = Math.hypot(ux - ox, uy - oy); // CSS px per PDF unit
-    const w = run.width * k, h = run.size * 1.2 * k;
-    Object.assign(box.style, {
+    const w = (multi ? colWidth : run.width) * k, h = run.size * 1.2 * k;
+    Object.assign(box.style, multi ? {
+      left: `${ox}px`, top: `${oy}px`, width: `${w + 2}px`, minHeight: `${lineGap * para.length * k}px`, lineHeight: `${lineGap * k}px`,
+      whiteSpace: "pre-wrap", textIndent: `${indent * k}px`,
+    } : {
       left: `${ox}px`, top: `${oy}px`, minWidth: `${w}px`, height: `${h}px`, lineHeight: `${h}px`,
+    });
+    Object.assign(box.style, {
       transformOrigin: "0 0", transform: vp.rotation ? `rotate(${vp.rotation}deg)` : "",
       fontFamily: family === "serif" ? "Times New Roman, Times, serif" : family === "mono" ? "Courier New, Courier, monospace" : "Helvetica, Arial, sans-serif",
       fontWeight: bold ? "700" : "400", fontStyle: italic ? "italic" : "normal",
@@ -197,7 +263,9 @@ export function setupEditText(ctx: Ctx) {
     sel?.selectAllChildren(box);
     const finish = (save: boolean) => {
       if (editing !== box) return;
-      const text = (box.textContent ?? "").replace(/\s+/g, " ").trimEnd();
+      // Paragraphs keep line breaks typed with Shift+Enter; everything else is one line.
+      const raw = (box.innerText ?? box.textContent ?? "").replace(/\r/g, "");
+      const text = multi ? raw.split("\n").map((l) => l.replace(/[^\S\n]+/g, " ").trim()).join("\n").replace(/\n+$/, "") : raw.replace(/\s+/g, " ").trimEnd();
       const outside = save ? unsupportedChars(text) : [];
       const b = box as HTMLElement & { _glyphs?: "pending" | "ok" };
       if (outside.length && b._glyphs !== "ok") {
@@ -214,21 +282,30 @@ export function setupEditText(ctx: Ctx) {
         }, () => { b._glyphs = undefined; ctx.notify("Couldn’t load the font for these characters. Check your connection and try again.", "error"); });
         return;
       }
+      // Rows the browser wrapped the paragraph into (fonts differ slightly, so this is an estimate).
+      const rows = multi ? Math.round(box.scrollHeight / (lineGap * k)) : 1;
       editing = null;
       box.remove();
-      if (!save || text === run.str.trimEnd()) return;
+      if (!save || text === original.trimEnd()) return;
+      if (rows > para.length) {
+        const lastY = para[para.length - 1].y, below = lastY - (rows - para.length) * lineGap;
+        const hits = hit.runs.some((u) => !para.includes(u) && u.y < lastY - run.size * 0.5 && u.y > below - run.size * 0.5 && u.x < left + colWidth && u.x + u.width > left);
+        if (hits) ctx.notify("The paragraph is longer now and runs into the text below. Shorten it, or undo with Ctrl+Z.", "error");
+      }
       cache.delete(idx);
+      const lastY = para[para.length - 1].y;
       ctx.commit({
         pageIndex: idx,
-        rect: [run.x - 0.5, run.y - run.size * 0.25, run.width + 1, run.size * 1.2],
-        x: run.x, y: run.y, size: run.size, text, family, bold, italic, color: colors.fg, background: colors.bg,
-        align: isCentered ? "center" : "left", original: run.str,
+        rect: multi ? [left - 0.5, lastY - run.size * 0.25, colWidth + 1, para[0].y - lastY + run.size * 1.2] : [run.x - 0.5, run.y - run.size * 0.25, run.width + 1, run.size * 1.2],
+        x: multi ? left : run.x, y: para[0].y, size: run.size, text, family, bold, italic, color: colors.fg, background: colors.bg,
+        align: isCentered ? "center" : "left", original: para.map((u) => u.str).join(""),
+        ...(multi ? { wrap: { width: colWidth + run.size * 0.2, lineHeight: lineGap, indent } } : {}),
       });
     };
     (box as any)._finish = finish;
     box.addEventListener("keydown", (ev) => {
       ev.stopPropagation();
-      if (ev.key === "Enter") { ev.preventDefault(); finish(true); }
+      if (ev.key === "Enter" && !(multi && ev.shiftKey)) { ev.preventDefault(); finish(true); }
       else if (ev.key === "Escape") { ev.preventDefault(); finish(false); }
     });
     box.addEventListener("blur", () => setTimeout(() => finish(true), 0));

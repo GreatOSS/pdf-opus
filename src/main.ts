@@ -967,7 +967,7 @@ function renderToolOptions(toolId: string) {
     toolDraw: { colors: palette, size: ["Thickness", 1, 20, 3], opacity: true, hint: "Drag on a page to draw." },
     toolSign: { colors: [], hint: "Click on a page to place your signature. Drag to move it, drag a corner to resize." },
     toolNote: { colors: [], hint: "Click on a page (or press Enter) to add a sticky note. Click a note to reply, change or delete it." },
-    toolEdit: { colors: [], hint: "Click any line of text to change it. Enter to apply, Esc to cancel." },
+    toolEdit: { colors: [], hint: "Click any text to change it — paragraphs open whole. Enter to apply, Shift+Enter for a new line, Esc to cancel." },
     toolRedact: { colors: [], hint: "Drag over anything you want to remove permanently — text underneath is deleted, not just covered." },
     toolImage: { colors: [], hint: "Choose an image, then drag it where you want. Click on a page to add another." },
   };
