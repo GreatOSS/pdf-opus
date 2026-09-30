@@ -354,3 +354,16 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | IRS W-9: type line 1, Tab to line 2, tick “Individual/sole proprietor” | OK — Tab follows the form order |
 | Add signature → Type tab → name → Place signature → click page | OK, signature placed |
 | Save (download in Firefox) | OK. Field values and checkbox (/1) in the AcroForm, text found by pdftotext, signature rendered by Poppler, `qpdf --check` clean. No page or console errors. No changes needed |
+
+## 2026-09-30 — speed on a large document (Chromium, 1366×768, production build)
+
+840-page PDF (tracemonkey ×60, built with qpdf):
+
+| Workflow | Result |
+|---|---|
+| Open → first page drawn | 0.6 s |
+| Type 800 in the page box → page 800 drawn | 0.6 s |
+| Find “Trace-based” across all pages | 403 matches, 5.1 s |
+| 30 fast wheel flicks → visible pages drawn | within ~20 ms of stopping; 6 page canvases alive, JS heap 53 MB |
+| Rotate / delete a page, then Undo (rewrites the whole file) | 0.75 s / 0.75 s / 0.5 s |
+| Thumbnail of page 800 after scrolling the sidebar | drawn. No errors. No changes needed |
