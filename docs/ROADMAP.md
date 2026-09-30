@@ -8,7 +8,7 @@ Leaflark's baseline answers the first three by design (free, local, unlimited, n
 1. **Edit existing text** — v1 done 2026-09-29 (cover + retype with matched standard font). Next: remove original glyphs from the content stream, reuse embedded fonts when they contain the needed glyphs, multi-line paragraphs, Unicode via embedded fallback font.
 2. **Redaction** — v1 done 2026-09-29 (text glyphs removed from page content streams, overlapping annotations deleted). Form XObject text, metadata scrub and image pixel erasure (JPEG + Flate, incl. PNG predictors) done. Find & mark (redact every match) done. Next: inline images (BI…EI) and JBIG2/CCITT scans are removed whole rather than edited.
 3. ~~Page numbers / watermark~~ (done 2026-09-29); headers/footers with custom text and Bates numbering next.
-4. ~~Compress~~ (done 2026-09-30: Reduce file size) and ~~OCR~~ (done 2026-09-30: English, on-device). Next: more OCR languages, cancel button.
+4. ~~Compress~~ (done 2026-09-30: Reduce file size) and ~~OCR~~ (done 2026-09-30: English, on-device). Cancel done. Next: more OCR languages.
 5. ~~Merge AcroForm fields when combining forms~~ (done 2026-09-29).
 6. End-to-end tests (Playwright) for the workflows in docs/TESTING.md; run in CI.
 7. Recent files list (IndexedDB, opt-in), presentation mode, print cross-browser verification.

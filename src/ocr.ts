@@ -55,7 +55,7 @@ export function addTextLayer(doc: PDFDocument, pageIndex: number, words: OcrWord
 
 export async function ocrDocument(
   pdf: PDFDocumentProxy, bytes: Uint8Array, pages: number[], { password = "" }: CryptOptions,
-  onProgress: (p: OcrProgress) => void, signal: { cancelled: boolean },
+  onProgress: (p: OcrProgress) => void, signal: { cancelled: boolean; abort?: () => void },
 ): Promise<{ bytes: Uint8Array; words: number }> {
   const base = new URL(`${import.meta.env.BASE_URL}ocr/`, location.href).href;
   const { createWorker } = await import("tesseract.js");
@@ -64,6 +64,13 @@ export async function ocrDocument(
     workerPath: `${base}worker.min.js`, corePath: base, langPath: `${base}lang`, gzip: true, cacheMethod: "none",
     logger: (m: { status: string; progress: number }) => onProgress({ page: current, pages: pages.length, status: m.status, progress: m.progress }),
   });
+  // Cancelling stops the worker at once (mid-page) and rejects the pending recognition,
+  // which otherwise would never settle once its worker is gone.
+  let rejectCancel!: (e: Error) => void;
+  const cancelled = new Promise<never>((_, reject) => { rejectCancel = reject; });
+  cancelled.catch(() => {});
+  signal.abort = () => { rejectCancel(new Error("Cancelled")); void worker.terminate().catch(() => {}); };
+  if (signal.cancelled) signal.abort();
   try {
     const doc = await PDFDocument.load(bytes, { password, updateMetadata: false });
     const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -79,7 +86,7 @@ export async function ocrDocument(
       const canvas = document.createElement("canvas");
       canvas.width = Math.ceil(vp.width); canvas.height = Math.ceil(vp.height);
       await page.render({ canvas, canvasContext: canvas.getContext("2d")!, viewport: vp, background: "#fff" } as any).promise;
-      const { data } = await worker.recognize(canvas, {}, { blocks: true });
+      const { data } = await Promise.race([worker.recognize(canvas, {}, { blocks: true }), cancelled]);
       const found: OcrWord[] = [];
       for (const b of (data as any).blocks ?? []) for (const p of b.paragraphs ?? []) for (const l of p.lines ?? []) {
         // Lines can mix text sizes (e.g. a big form number next to a title), so work per word:
@@ -99,6 +106,7 @@ export async function ocrDocument(
     if (password) doc.encrypt({ userPassword: password, ownerPassword: password });
     return { bytes: await doc.save(), words };
   } finally {
-    await worker.terminate();
+    signal.abort = undefined;
+    await worker.terminate().catch(() => {});
   }
 }

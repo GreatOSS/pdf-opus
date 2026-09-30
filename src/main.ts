@@ -114,7 +114,7 @@ $("#app").innerHTML = `
         <p class="hint">or drop PDFs or images anywhere · ${mod}O<br />Drop several files to combine them</p>
       </div>
     </section>
-    <div id="loading" class="loading" hidden><div class="spinner"></div><span id="loadingText">Opening…</span></div>
+    <div id="loading" class="loading" hidden><div class="spinner"></div><span id="loadingText">Opening…</span><button id="loadingCancel" class="text-btn" type="button" hidden>Cancel</button></div>
   </main>
 </div>
 <div id="dropOverlay" class="drop-overlay" hidden><div>Drop PDF to open</div></div>
@@ -320,11 +320,14 @@ function closeDocument() {
   });
 }
 
-function showLoading(text: string) {
+function showLoading(text: string, onCancel?: () => void) {
   $("#loadingText").textContent = text;
   $("#loading").hidden = false;
+  const cancel = $("#loadingCancel") as HTMLButtonElement;
+  cancel.hidden = !onCancel;
+  cancel.onclick = onCancel ? () => { cancel.hidden = true; $("#loadingText").textContent = "Cancelling…"; onCancel(); } : null;
 }
-function hideLoading() { $("#loading").hidden = true; }
+function hideLoading() { $("#loading").hidden = true; ($("#loadingCancel") as HTMLButtonElement).hidden = true; }
 
 function updateTitle() {
   const t = $("#docTitle");
@@ -900,15 +903,19 @@ async function ocrDialog() {
   });
   if (!ok) return;
   let words = 0;
+  const signal = { cancelled: false, abort: undefined as undefined | (() => void) };
+  const cancel = () => { signal.cancelled = true; signal.abort?.(); };
   const done = await mutatePages("Recognizing text", async (b) => {
     const r = await (await import("./ocr")).ocrDocument(pdf, b, pages, crypt(), ({ page, pages: total, status, progress }) => {
-      showLoading(page ? `Recognizing text… page ${page} of ${total} (${Math.round(progress * 100)}%)` : `Preparing text recognition… ${status === "loading language traineddata" ? `${Math.round(progress * 100)}%` : ""}`);
-    }, { cancelled: false });
+      if (signal.cancelled) return;
+      showLoading(page ? `Recognizing text… page ${page} of ${total} (${Math.round(progress * 100)}%)` : `Preparing text recognition… ${status === "loading language traineddata" ? `${Math.round(progress * 100)}%` : ""}`, cancel);
+    }, signal).catch((e) => { if (signal.cancelled) throw new Unchanged(); throw e; });
     words = r.words;
     if (!words) throw new Error("No text was recognized on these pages");
     return r.bytes;
   }, viewer.currentPageNumber, true);
-  if (done) toast(`Recognized ${words} words on ${pages.length} page${pages.length === 1 ? "" : "s"} — you can now search and select the text. Save to keep it.`);
+  if (signal.cancelled) toast("Text recognition cancelled — nothing was changed.");
+  else if (done) toast(`Recognized ${words} words on ${pages.length} page${pages.length === 1 ? "" : "s"} — you can now search and select the text. Save to keep it.`);
 }
 
 /** Mark every occurrence of a phrase (e.g. a name or account number) for redaction. */
