@@ -248,6 +248,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — More menu: grouping and short screens
 - The menu had grown to 17 items with one 10-item block mixing file and page tools, and no scrolling: at 700 px tall it just fit, on shorter screens (landscape phones, small iPhones) the bottom items were unreachable. Regrouped (File · Pages · Document tools · View · Info) and capped the height to the viewport with scrolling. Verified: 740×360 touch → menu 48–348 px, scrolls, “Close document” reachable and works; desktop grouping reads cleanly.
 
+### 2026-09-30 — Performance: 800-page document
+- Production build, big800.pdf (1.9 MB): first page rendered ~1.0 s; 800 thumbnail slots, only visible ones rendered (5); jump to p700 146 ms; no long tasks; JS heap ~20 MB; 4 page canvases alive. Found: searching from p700 showed “No matches” for ~0.5 s before the first hit — running count updates with 0 matches were treated as final. Now shows “Searching…” until pdf.js reports NOT_FOUND. Re-test: “Page” → Searching… → 27961 of 32000+; “zebraxyz” → No matches.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

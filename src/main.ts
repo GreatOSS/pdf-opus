@@ -1306,9 +1306,12 @@ const showCount = ({ matchesCount, state }: any) => {
   const c = $("#findCount");
   const { current = 0, total = 0 } = matchesCount ?? {};
   if (!findInput.value) { c.textContent = ""; c.classList.remove("none"); return; }
-  if (state === 1 /* FindState.NOT_FOUND */ || (state === undefined && total === 0)) { c.textContent = "No matches"; c.classList.add("none"); return; }
+  if (state === 1 /* FindState.NOT_FOUND */) { c.textContent = "No matches"; c.classList.add("none"); return; }
+  // Running counts arrive while pages are still being scanned; 0 so far isn't "no matches" yet
+  // (in long documents that flashed "No matches" before the first hit came in).
+  if (!total) { c.textContent = "Searching…"; c.classList.remove("none"); return; }
   c.classList.remove("none");
-  if (total) c.textContent = `${current} of ${total}${total >= 1000 ? "+" : ""}`;
+  c.textContent = `${current} of ${total}${total >= 1000 ? "+" : ""}`;
 };
 eventBus.on("updatefindmatchescount", showCount);
 eventBus.on("updatefindcontrolstate", (e: any) => {
