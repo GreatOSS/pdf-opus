@@ -82,6 +82,7 @@ $("#app").innerHTML = `
     <div class="sidebar-tabs" role="tablist">
       <button role="tab" id="tabPages" aria-selected="true">${icons.pages}<span>Pages</span></button>
       <button role="tab" id="tabOutline" aria-selected="false">${icons.outline}<span>Outline</span></button>
+      <button role="tab" id="tabNotes" aria-selected="false">${icons.note}<span>Notes</span></button>
     </div>
     <div id="pagesPanel" class="panel">
       <div class="page-actions">
@@ -94,6 +95,7 @@ $("#app").innerHTML = `
       <div id="thumbs" class="thumbs" role="listbox" aria-multiselectable="true" aria-label="Pages" tabindex="0"></div>
     </div>
     <div id="outlinePanel" class="panel" hidden><div id="outline" class="outline"></div></div>
+    <div id="notesPanel" class="panel" hidden><div id="notesList" class="notes-list" aria-live="polite"></div></div>
     <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
   </aside>
   <main class="stage">
@@ -257,6 +259,8 @@ async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | n
   updateTitle();
   thumbs.setDocument(pdf, keep ? thumbs.selectionAfterReload : undefined);
   loadOutline(pdf);
+  notesFor = null;
+  if (!$("#notesPanel").hidden) void loadNotes();
   updateUndoButtons();
   if (old) setTimeout(() => old.loadingTask.destroy(), 0);
   if (!keep) { currentMode = Mode.NONE; syncToolUI("toolNone"); }
@@ -330,6 +334,8 @@ function closeDocument() {
     void renderRecent();
     $("#findBar").hidden = true;
     $("#outline").replaceChildren();
+    $("#notesList").replaceChildren();
+    notesFor = null;
     pageUndo.length = pageRedo.length = 0;
     updateTitle();
   });
@@ -1305,14 +1311,62 @@ function highlightOutline(page: number, viewTop?: number) {
   });
   if (!$("#outlinePanel").hidden) best.link.scrollIntoView({ block: "nearest" });
 }
-function setTab(which: "pages" | "outline") {
+function setTab(which: "pages" | "outline" | "notes") {
   $("#tabPages").ariaSelected = String(which === "pages");
   $("#tabOutline").ariaSelected = String(which === "outline");
+  $("#tabNotes").ariaSelected = String(which === "notes");
   $("#pagesPanel").hidden = which !== "pages";
   $("#outlinePanel").hidden = which !== "outline";
+  $("#notesPanel").hidden = which !== "notes";
+  if (which === "notes" && doc && notesFor !== doc.pdf) void loadNotes();
 }
 $("#tabPages").onclick = () => setTab("pages");
 $("#tabOutline").onclick = () => setTab("outline");
+$("#tabNotes").onclick = () => setTab("notes");
+
+// ───────────────────────────── Notes list ─────────────────────────────
+let notesFor: PDFDocumentProxy | null = null;
+async function loadNotes() {
+  if (!doc) return;
+  const pdf = doc.pdf;
+  notesFor = pdf;
+  const root = $("#notesList");
+  root.replaceChildren(el("p", { className: "empty", textContent: "Looking for notes…" }));
+  const { collectNotes } = await import("./notelist");
+  const notes = await collectNotes(pdf, () => doc?.pdf !== pdf || notesFor !== pdf);
+  if (!notes) return;
+  if (!notes.length) {
+    root.replaceChildren(el("p", { className: "empty", textContent: "No notes or comments in this document. Use Add note (N) to leave one." }));
+    return;
+  }
+  const when = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+  root.replaceChildren(el("p", { className: "notes-count", textContent: notes.length === 1 ? "1 note" : `${notes.length} notes` }));
+  for (const n of notes) {
+    const meta = [`Page ${n.page}`, n.kind, n.author, n.date ? when.format(n.date) : ""].filter(Boolean).join(" · ");
+    const b = el("button", { type: "button", className: "note-item" }, [
+      el("span", { className: "note-meta", textContent: meta }),
+      el("span", { className: "note-body" + (n.text ? "" : " empty-note"), textContent: n.text || "(empty note)" }),
+    ]) as HTMLButtonElement;
+    b.onclick = () => goToNote(n.page, n.id, n.rect);
+    root.append(b);
+  }
+}
+function goToNote(page: number, id: string, rect: number[]) {
+  viewer.scrollPageIntoView({ pageNumber: page, destArray: [null, { name: "XYZ" }, Math.max(0, rect[0] - 40), rect[3] + 60, null] });
+  // The annotation layer may still be rendering; wait for the element, then point it out.
+  let tries = 0;
+  const find = () => {
+    const a = container.querySelector<HTMLElement>(`.page[data-page-number="${page}"] [data-annotation-id="${CSS.escape(id)}"]`);
+    if (!a) { if (++tries < 40) setTimeout(find, 50); return; }
+    a.classList.remove("note-flash");
+    void a.offsetWidth;
+    a.classList.add("note-flash");
+    // Open the note's popup (pdf.js puts it in a sibling "popup_<id>" section).
+    const popup = a.parentElement?.querySelector<HTMLElement>(`[data-annotation-id="popup_${CSS.escape(id)}"]`);
+    if (popup?.hidden) a.click();
+  };
+  find();
+}
 
 // ───────────────────────────── Find ─────────────────────────────
 const findInput = $("#findInput") as HTMLInputElement;

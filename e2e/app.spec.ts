@@ -249,3 +249,21 @@ test("sticky notes can be added, edited and deleted", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(page.locator("#toolNote")).toHaveAttribute("aria-pressed", "false");
 });
+
+test("notes tab lists notes and jumps to them", async ({ page }) => {
+  await open(page, 3);
+  await page.locator("#tabNotes").click();
+  await expect(page.locator("#notesList")).toContainText("No notes");
+  const tabs = page.locator(".sidebar-tabs");
+  expect(await tabs.evaluate((t) => t.scrollWidth <= t.clientWidth)).toBe(true);
+  await page.locator("#toolNote").click();
+  const box = (await page.locator('.page[data-page-number="1"]').boundingBox())!;
+  await page.mouse.click(box.x + 300, box.y + 200);
+  await page.getByRole("textbox", { name: "Note" }).fill("Listed note");
+  await page.getByRole("button", { name: "Add note" }).last().click();
+  await expect(page.locator(".note-item")).toHaveCount(1);
+  await expect(page.locator(".note-item")).toContainText("Page 1 · Note");
+  await page.keyboard.press("Escape");
+  await page.locator(".note-item").click();
+  await expect(page.locator(".popupAnnotation").first()).toContainText("Listed note");
+});

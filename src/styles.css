@@ -70,6 +70,10 @@ body.resizing-sidebar { cursor: col-resize; user-select: none; }
 .sidebar-tabs { display: flex; padding: 6px; gap: 4px; border-bottom: 1px solid var(--border); flex: none; }
 .sidebar-tabs button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; height: 30px; border: 0; background: transparent; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
 .sidebar-tabs button svg { width: 16px; height: 16px; }
+.sidebar-tabs button { min-width: 0; padding: 0 4px; white-space: nowrap; }
+/* Three tabs: at the default sidebar width keep the labels and drop the icons. */
+.ll-sidebar { container-type: inline-size; }
+@container (max-width: 250px) { .sidebar-tabs button svg { display: none; } }
 .sidebar-tabs button[aria-selected="true"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
 .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .page-actions { display: flex; align-items: center; gap: 0; padding: 4px 6px; border-bottom: 1px solid var(--border); }
@@ -293,3 +297,12 @@ body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }
 @media (pointer: coarse) and (hover: none) { .hint-pointer { display: none; } .hint-touch { display: block; } }
 
 .note-text { width: min(420px, 80vw); height: auto; min-height: 8em; padding: 8px 10px; resize: vertical; font: inherit; line-height: 1.4; }
+.notes-list { overflow-y: auto; padding: 8px 6px; flex: 1; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.notes-count { color: var(--muted); margin: 0 6px 4px; font-size: 12px; }
+.note-item { display: flex; flex-direction: column; gap: 3px; text-align: left; border: 1px solid var(--border); border-left: 3px solid #f5c542; background: var(--surface); color: var(--text); border-radius: 6px; padding: 7px 9px; cursor: pointer; font: inherit; }
+.note-item:hover { background: var(--surface-2); }
+.note-meta { color: var(--muted); font-size: 11.5px; }
+.note-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.note-body.empty-note { color: var(--muted); font-style: italic; }
+@keyframes note-flash { 0%, 60% { box-shadow: 0 0 0 4px rgba(245, 197, 66, .9); } 100% { box-shadow: 0 0 0 4px rgba(245, 197, 66, 0); } }
+.annotationLayer .note-flash { animation: note-flash 1.4s ease-out; border-radius: 3px; }
