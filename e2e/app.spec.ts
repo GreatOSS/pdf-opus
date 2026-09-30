@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { PDFDocument, StandardFonts } from "@cantoo/pdf-lib";
+import { PDFDocument, StandardFonts, PDFName } from "@cantoo/pdf-lib";
 
 async function samplePdf(pages = 3): Promise<Buffer> {
   const doc = await PDFDocument.create();
@@ -389,4 +389,18 @@ test("editing a nested outline keeps it intact and expanded", async ({ page }) =
   await expect(page.locator("#outline a")).toHaveText(["Chapter 1", "Section 1.2", "Chapter 2 (closed)", "Section 2.1", "Appendix"]);
   await expect(page.locator("#outline li.open")).toHaveCount(1); // Chapter 1 stays expanded
   await expect(page.getByText("Section 1.2")).toBeVisible();
+});
+
+test("uses the document's printed page numbers", async ({ page }) => {
+  const d = await PDFDocument.create();
+  for (let i = 0; i < 7; i++) d.addPage([300, 400]);
+  d.catalog.set(PDFName.of("PageLabels"), d.context.obj({ Nums: [0, { S: "r" }, 3, { S: "D" }] }));
+  await page.goto("/");
+  await page.locator("#fileInput").setInputFiles({ name: "labels.pdf", mimeType: "application/pdf", buffer: Buffer.from(await d.save()) });
+  await expect(page.locator("#pageInput")).toHaveValue("i");
+  await expect(page.locator("#pageCount")).toHaveText("(1 of 7)");
+  await page.locator("#pageInput").fill("2");
+  await page.locator("#pageInput").press("Enter");
+  await expect(page.locator("#pageCount")).toHaveText("(5 of 7)");
+  await expect(page.locator(".thumb-label").nth(2)).toHaveText("iii (3)");
 });

@@ -260,7 +260,17 @@ async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | n
     hideLoading();
     if (keep && currentMode !== Mode.NONE) setMode(currentMode, true, activeToolId);
   });
+  pageLabels = null;
   $("#pageCount").textContent = String(pdf.numPages);
+  $("#pageCount").parentElement!.firstChild!.textContent = "of ";
+  // Printed page numbers (i, ii, … 1, 2, …): the page box shows and accepts them when present.
+  void pdf.getPageLabels().then((labels) => {
+    if (doc?.pdf !== pdf || !labels || labels.every((l, i) => l === String(i + 1))) return;
+    pageLabels = labels;
+    viewer.setPageLabels(labels);
+    thumbs.setLabels(labels);
+    showPage(viewer.currentPageNumber);
+  }, () => {});
   (($("#pageInput") as HTMLInputElement).value = "1");
   updateTitle();
   thumbs.setDocument(pdf, keep ? thumbs.selectionAfterReload : undefined);
@@ -1303,8 +1313,18 @@ async function applyRedactionMarks() {
 
 // ───────────────────────────── Navigation / zoom ─────────────────────────────
 const pageInput = $("#pageInput") as HTMLInputElement;
+let pageLabels: string[] | null = null;
+/** Page box and count: "5 of 14", or with printed labels "iii (3 of 120)". */
+function showPage(n: number) {
+  const label = pageLabels?.[n - 1];
+  pageInput.value = label || String(n);
+  // Long labels ("Cover", "A-12") need a wider box; capped so the toolbar still fits.
+  pageInput.style.width = label && label.length > 4 ? `${Math.min(label.length + 2, 12)}ch` : "";
+  $("#pageCount").textContent = label ? `(${n} of ${doc?.pdf.numPages ?? 0})` : String(doc?.pdf.numPages ?? 0);
+  $("#pageCount").parentElement!.firstChild!.textContent = label ? "" : "of ";
+}
 eventBus.on("pagechanging", ({ pageNumber }: { pageNumber: number }) => {
-  pageInput.value = viewer.currentPageLabel ?? String(pageNumber);
+  showPage(pageNumber);
   thumbs.setCurrent(pageNumber);
   highlightOutline(pageNumber);
 });
@@ -1318,9 +1338,11 @@ pageInput.addEventListener("change", () => {
   if (!doc) return;
   const v = pageInput.value.trim();
   const n = parseInt(v, 10);
-  if ((viewer as any)._pageLabels || isNaN(n)) viewer.currentPageLabel = v;
-  else viewer.currentPageNumber = Math.max(1, Math.min(n, doc.pdf.numPages));
-  pageInput.value = viewer.currentPageLabel ?? String(viewer.currentPageNumber);
+  // A printed label wins ("5" is the page printed 5, "iv" works too); otherwise a plain page number.
+  const byLabel = pageLabels ? pageLabels.findIndex((l) => l.toLowerCase() === v.toLowerCase()) : -1;
+  if (byLabel >= 0) viewer.currentPageNumber = byLabel + 1;
+  else if (!isNaN(n)) viewer.currentPageNumber = Math.max(1, Math.min(n, doc.pdf.numPages));
+  showPage(viewer.currentPageNumber);
   container.focus();
 });
 pageInput.addEventListener("focus", () => pageInput.select());

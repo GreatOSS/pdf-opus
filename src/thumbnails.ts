@@ -75,6 +75,15 @@ export class Thumbnails {
 
   selected(): number[] { return [...this.sel].sort((a, b) => a - b); }
 
+  /** Show the document's own page labels (e.g. "iii", "A-2") under the thumbnails. */
+  setLabels(labels: string[] | null) {
+    this.items.forEach((item, i) => {
+      const l = labels?.[i];
+      const text = l && l !== String(i + 1) ? `${l} (${i + 1})` : String(i + 1);
+      item.querySelector(".thumb-label")!.textContent = text;
+      item.setAttribute("aria-label", l && l !== String(i + 1) ? `Page ${l} (${i + 1})` : `Page ${i + 1}`);
+    });
+  }
   setCurrent(page: number) {
     const prev = this.items[this.current - 1];
     if (prev) { prev.classList.remove("current"); prev.tabIndex = -1; }

@@ -294,6 +294,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Output validity across producers
 - Inputs: tracemonkey and f1040 rewritten by qpdf (object streams, linearized, AES-256 owner-password-only, QDF) and by Ghostscript pdfwrite, plus the Ghostscript outlined PDF (11 files). Ran flatten, note, bookmark, crop, page numbers + watermark, redaction, reorder + rotate, merge and reduce-size on each (99 outputs): no exceptions; Ghostscript, `qpdf --check` and pdfinfo report nothing on any output; for the edits that shouldn't change page 2's look (note, bookmark, merge, reduce-size, flatten of blank fields) page 2 renders byte-identical to the input. No changes needed.
 
+### 2026-09-30 — Printed page numbers (page labels)
+- Page labels were never loaded (the page box always showed physical numbers). Now, when a document has labels that differ from 1…n: the page box shows the label with “(n of N)”, typing a label goes there (case-insensitive; “5” means printed page 5, a number that isn't a label is a physical page), thumbnails read “iii (4)”, the box widens for long labels. Test file (Cover, i–iii, 1–8): start “Cover (1 of 12)”; “5” → p9; “III” → p4; “11” → p11 (label 7); “zz” ignored; then opening tracemonkey shows “1 of 14” again. No page errors. New e2e (3 engines) 72/72, unit 68/68.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; text drawn rotated within the page (not via page rotation) isn't editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
