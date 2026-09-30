@@ -44,6 +44,24 @@ export function groupRuns(items: any[]): Run[] {
 }
 
 
+/**
+ * Is this run centred? True when it is indented from the text block's left edge and the gaps on
+ * both sides are about equal (against the text block, or the page). Block edges are estimated
+ * from all runs on the page; flush-left and first-line-indented lines don't qualify.
+ */
+export function looksCentered(run: { x: number; width: number }, runs: { x: number; width: number }[], view: number[]): boolean {
+  const [vx0, , vx1] = view;
+  const pw = vx1 - vx0;
+  const q = (arr: number[], f: number) => arr[Math.min(arr.length - 1, Math.floor(arr.length * f))] ?? 0;
+  const left = q(runs.map((u) => u.x).sort((a, b) => a - b), 0.1);
+  const right = q(runs.map((u) => u.x + u.width).sort((a, b) => a - b), 0.9);
+  const end = run.x + run.width;
+  const gapL = run.x - left;
+  if (gapL < pw * 0.03) return false;
+  const symmetric = (l: number, r: number) => Math.abs(l - r) < pw * 0.02;
+  return symmetric(gapL, right - end) || symmetric(run.x - vx0, vx1 - end);
+}
+
 const familyOf = (css: string | undefined, name: string): TextEdit["family"] => {
   const n = name.toLowerCase();
   if (/courier|mono|consol|menlo/.test(n) || css === "monospace") return "mono";
@@ -149,14 +167,7 @@ export function setupEditText(ctx: Ctx) {
     const italic = /italic|oblique/i.test(realName);
     // Treat runs centred on the text block (or page) as centred text, so shorter/longer
     // replacements stay centred. Block edges are estimated from all runs on the page.
-    const [vx0, , vx1] = page.view as number[];
-    const pw = vx1 - vx0;
-    const lefts = hit.runs.map((u) => u.x).sort((a, b) => a - b);
-    const rights = hit.runs.map((u) => u.x + u.width).sort((a, b) => a - b);
-    const q = (arr: number[], f: number) => arr[Math.min(arr.length - 1, Math.floor(arr.length * f))] ?? 0;
-    const blockMid = (q(lefts, 0.1) + q(rights, 0.9)) / 2;
-    const mid = run.x + run.width / 2;
-    const isCentered = run.x - q(lefts, 0.1) > pw * 0.08 && (Math.abs(mid - blockMid) < pw * 0.015 || Math.abs(mid - (vx0 + vx1) / 2) < pw * 0.015);
+    const isCentered = looksCentered(run, hit.runs, page.view as number[]);
     const box = document.createElement("div");
     box.className = "edit-box";
     if (isCentered) { box.style.textAlign = "center"; }
