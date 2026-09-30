@@ -201,3 +201,11 @@ test("prints every page as an image, then cleans up", async ({ page }) => {
   await expect(page.locator("#printContainer")).toHaveCount(0);
   await expect(page.locator("#loading")).toBeHidden();
 });
+
+test("ships a Content-Security-Policy that keeps files on the device", async ({ page }) => {
+  await page.goto("/");
+  const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
+  expect(csp).toContain("connect-src 'self'");
+  expect(csp).toContain("object-src 'none'");
+  expect(csp).not.toContain("'unsafe-eval'"); // 'wasm-unsafe-eval' is fine
+});

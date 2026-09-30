@@ -43,8 +43,8 @@ Open a file with the **Open** button, <kbd>Ctrl</kbd>+<kbd>O</kbd>, drag and dro
 
 ## Privacy
 
-Leaflark has no server component, analytics or network calls beyond loading its own assets.
+Leaflark has no server component, analytics or network calls beyond loading its own assets. Built pages enforce this with a Content-Security-Policy that only allows requests to Leaflark’s own origin.
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE). Leaflark bundles pdf.js (Apache-2.0), pdf-lib (MIT), tesseract.js with its English data (Apache-2.0), the Great Vibes, Dancing Script and Caveat fonts (SIL OFL 1.1) and DejaVu Sans (Bitstream Vera licence); font licences are in `public/fonts`.
+Apache-2.0. See [LICENSE](LICENSE). Leaflark bundles pdf.js (Apache-2.0), pdf-lib (MIT), tesseract.js with its language data (Apache-2.0), the Great Vibes, Dancing Script and Caveat fonts (SIL OFL 1.1) and DejaVu Sans (Bitstream Vera licence); font licences are in `public/fonts`.

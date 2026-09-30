@@ -28,6 +28,28 @@ const precache = () => ({
 
 // pdf.js needs its CMaps, standard fonts, ICC profiles, WASM decoders and
 // editor images at runtime; ship them next to the app.
+// Content-Security-Policy for built pages: backs up the "files never leave this device" promise
+// (no requests to other origins, even from injected script) and blocks plugins, frames and eval.
+// wasm-unsafe-eval: pdf.js image decoders and OCR; blob: workers: tesseract.js. Dev server skipped (HMR websocket).
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "worker-src 'self' blob:",
+  "connect-src 'self' blob: data:",
+  "img-src 'self' blob: data:",
+  "font-src 'self' blob: data:",
+  "style-src 'self' 'unsafe-inline'",
+  "object-src 'none'",
+  "frame-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join("; ");
+const csp = () => ({
+  name: "leaflark-csp",
+  apply: "build" as const,
+  transformIndexHtml: (html: string) => html.replace("<meta charset=\"utf-8\" />", `<meta charset="utf-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+});
+
 export default defineConfig({
   base: "./",
   plugins: [
@@ -44,6 +66,7 @@ export default defineConfig({
       ] as any),
     }),
     precache(),
+    csp(),
   ],
   build: { target: "es2022", chunkSizeWarningLimit: 2000 },
   server: { port: 5173, host: "127.0.0.1" },

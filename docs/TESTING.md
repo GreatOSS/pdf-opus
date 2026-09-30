@@ -227,6 +227,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Printing rebuilt
 - Print used to load the PDF into a hidden iframe and call the browser's PDF viewer — downloads instead of printing on Android Chrome (no viewer) and wherever the viewer is disabled, and known to print blank/first page only from iframes in Safari. Now every page is rendered at 150 dpi (print intent, current form values/annotations) into a print-only container (@page sized from page 1), with progress + Cancel; cleaned up on afterprint. Verified by stubbing window.print and printing the print-media page to PDF in Chromium: f1040 with typed “Zoë Printtest” + checked box → 2 Letter pages, both values visible; tracemonkey → 14 pages, ~1 s; 16:9 slides → 960×540 pages. New e2e test in Chromium, WebKit, Firefox. Remaining: real printers/dialogs untested (headless).
 
+### 2026-09-30 — Content-Security-Policy
+- Built pages now carry a CSP (injected at build; dev server exempt for HMR): default/script/connect 'self' (+ 'wasm-unsafe-eval' for pdf.js decoders and OCR, blob: workers for tesseract), no eval, no plugins/frames/forms. Backs up “files never leave this device” even against injected script. Hands-on against `vite preview`: scan → OCR (7 words), Edit text “Łódź” (DejaVu fetch), typed signature (web font), print, save — zero securitypolicyviolation events, no console errors. Cross-origin fetch and image load from the page are blocked. Full e2e suite (runs on the built preview) 40/40 with the policy in place, incl. a new check of the policy itself.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
