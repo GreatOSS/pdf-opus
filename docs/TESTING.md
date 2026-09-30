@@ -212,6 +212,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Edit text: bold/italic detection
 - Checked the Edit-text bold path left open last time: tracemonkey “Abstract” (NimbusRomNo9L-Medi) → typed “Łódź Abstract” → saved with regular DejaVu, i.e. the heading wasn't seen as bold at all — the name check only knew bold/black/heavy/semibold/demi, so URW “Medi”, TeX CMBX, “Bd” were treated as regular (and “Ital”, CMTI as upright), also for plain-ASCII edits (bold heading re-typed in regular Times). Now uses pdf.js's bold/black/italic flags plus a broader name check (“Medium” stays regular). Re-test: edit box weight 700, saved PDF embeds DejaVuSans-Bold subset, Poppler render bold. unit 51/51.
 
+### 2026-09-30 — WebKit: text box + typed signature
+- WebKit (Playwright, Safari engine), tracemonkey p1: Add text → click → typed “WebKit note”; Add signature → Type tab → “Ada Lovelace” → Place signature → click on page (move/resize handles, Alt text button shown); Save → download. Saved file has a FreeText and a Stamp annotation; Poppler renders both where placed. No console errors. No changes needed.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
