@@ -15,7 +15,20 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npx vite build
-      - run: npx playwright install --with-deps chromium firefox webkit
+      # The browsers' system libraries (~130 MB of .debs) can take 10+ minutes from a slow mirror:
+      # keep them, with the browsers, between runs.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-debs
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install browsers
+        run: |
+          echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99keep-debs
+          if ls ~/apt-debs/*.deb >/dev/null 2>&1; then sudo cp ~/apt-debs/*.deb /var/cache/apt/archives/; fi
+          npx playwright install --with-deps chromium firefox webkit
+          mkdir -p ~/apt-debs && cp /var/cache/apt/archives/*.deb ~/apt-debs/ 2>/dev/null || true
       - run: npx playwright test
         env: { CI: "1" }
       - uses: actions/upload-artifact@v4
