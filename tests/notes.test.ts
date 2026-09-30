@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, PDFName, PDFArray, PDFDict, PDFHexString } from "@cantoo/pdf-lib";
-import { addNote, updateNote } from "../src/notes";
+import { addNote, updateNote, addReply } from "../src/notes";
 
 async function blank() {
   const d = await PDFDocument.create();
@@ -37,5 +37,23 @@ describe("sticky notes", () => {
     b = await updateNote(b, 0, id, null);
     r = await annotsOf(b);
     expect(r.list).toHaveLength(0);
+  });
+  it("replies point at their note, and deleting the note removes the thread", async () => {
+    let b = await addNote(await blank(), 0, [100, 700], "question");
+    b = await addNote(b, 0, [300, 300], "unrelated");
+    const idOf = (ref: any) => `${ref.objectNumber}R${ref.generationNumber || ""}`;
+    const first = (await annotsOf(b)).list[0].ref as any;
+    b = await addReply(b, 0, idOf(first), "answer", { author: "Bo" });
+    let r = await annotsOf(b);
+    expect(r.list).toHaveLength(3);
+    const reply = r.list[2].dict;
+    expect(reply.get(PDFName.of("IRT"))).toBe(first);
+    expect(reply.get(PDFName.of("RT"))).toBe(PDFName.of("R"));
+    expect((reply.lookup(PDFName.of("T")) as PDFHexString).decodeText()).toBe("Bo");
+    // a reply to the reply goes too
+    b = await addReply(b, 0, idOf(r.list[2].ref), "thanks");
+    b = await updateNote(b, 0, idOf(first), null);
+    r = await annotsOf(b);
+    expect(r.list.map((x) => (x.dict.lookup(PDFName.of("Contents")) as PDFHexString).decodeText())).toEqual(["unrelated"]);
   });
 });

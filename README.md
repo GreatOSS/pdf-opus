@@ -10,7 +10,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 - **Find** — full-text search with live match count, case-sensitive and whole-word options.
 - **Edit existing text** — click a line to retype it in place; font style, size, colour and alignment are matched, and the old text is removed from the file. Accented Latin, Greek, Cyrillic and common symbols work too (a small subset of DejaVu Sans is embedded when needed).
 - **Redact** — mark areas and remove what's underneath from the file for real (not just a black box): text, image pixels and overlapping annotations. “Find & mark” marks every occurrence of a name or number in one go.
-- **Sticky notes** — click anywhere to leave a note; it opens in every PDF app (Acrobat, Preview, browsers). Click a note to change or delete it; the Notes tab in the sidebar lists every note and comment in the document.
+- **Sticky notes** — click anywhere to leave a note; it opens in every PDF app (Acrobat, Preview, browsers). Click a note to reply, change or delete it; the Notes tab in the sidebar lists every note and comment in the document.
 - **Annotate** — highlight text (or freehand), add text, draw, insert images, and sign — draw or type a signature once, keep it on your device, and place it with a click. Annotations are saved as standard PDF annotations that open in Acrobat, Preview, Chrome, Firefox, etc., and stay editable.
 - **Fill forms** — fill AcroForm fields (text, checkboxes, radio buttons, dropdowns) and save the values into the file.
 - **Recognize text (OCR)** — make scanned pages searchable and selectable; runs on your device (English, German, French, Spanish, Italian, Portuguese, Dutch).

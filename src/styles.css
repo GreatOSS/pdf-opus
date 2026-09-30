@@ -307,3 +307,9 @@ body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }
 .note-body.empty-note { color: var(--muted); font-style: italic; }
 @keyframes note-flash { 0%, 60% { box-shadow: 0 0 0 4px rgba(245, 197, 66, .9); } 100% { box-shadow: 0 0 0 4px rgba(245, 197, 66, 0); } }
 .annotationLayer .note-flash { animation: note-flash 1.4s ease-out; border-radius: 3px; }
+.note-reply { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 0 8px; padding-left: 8px; border-left: 2px solid var(--border); }
+.note-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto; }
+.note-thread li { display: flex; flex-direction: column; gap: 2px; padding-left: 10px; border-left: 2px solid #f5c542; font-size: 14px; }
+.note-thread .note-body { -webkit-line-clamp: unset; display: block; }
+.note-text.reply { min-height: 4em; }
+.note-text.compact { min-height: 4.5em; }

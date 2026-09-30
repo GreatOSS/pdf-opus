@@ -263,6 +263,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Note author name
 - Add note dialog now has “Your name” (optional, remembered on this device) → written as the note's /T, which Acrobat, Preview and pdf.js show as the author. Verified: “Ana Łucja” → second note prefilled; edit dialog title “Note by Ana Łucja”; Notes tab “Page 1 · Note · Ana Łucja · …”; pdf.js popup header shows the name. Found: the note dialog scrolled sideways (text box fixed at 420 px inside a 392 px dialog body, since the sticky-notes change) → text box now fills the dialog; checked at 1280 and 390 px, no overflow (asserted in e2e). e2e 51/51, unit 61/61.
 
+### 2026-09-30 — Replies to notes
+- Clicking a note with the Note tool now shows its thread and a “Write a reply…” box; replies are /Text annotations with /IRT → note, /RT /R (Acrobat's model), stacked on the note. The viewer shows one icon per thread (pdf.js drew each reply as its own icon on the same spot); the Notes tab nests replies under their note, oldest first. Deleting a note asks first when it has replies and removes the whole thread (incl. replies to replies, popups). tracemonkey as “Ana”/“Bo”: note → reply by Bo → dialog and Notes tab show “Bo · … Yes, approved.”; two notes with replies → delete one → confirm “Its reply will be deleted too.” → saved file: note 997 + reply 1000 (IRT 997 0 R), nothing else. Found: pdf.js also opened its popup behind our dialog when a note was clicked with the tool → suppressed; note box now compact when a thread is shown. e2e 51/51, unit 63/63.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

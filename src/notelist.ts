@@ -9,6 +9,8 @@ export interface NoteEntry {
   author: string;
   date: Date | null;
   rect: number[];
+  inReplyTo?: string;
+  replies: NoteEntry[];
 }
 
 const KINDS: Record<string, string> = {
@@ -35,8 +37,12 @@ export function pdfDate(s: string | undefined | null): Date | null {
 export function toEntry(a: any, page: number): NoteEntry | null {
   const kind = KINDS[a.subtype];
   const text = (a.contentsObj?.str ?? "").trim();
-  if (!kind || (a.subtype !== "Text" && !text) || a.inReplyTo) return null;
-  return { id: a.id, page, kind, text, author: (a.titleObj?.str ?? "").trim(), date: pdfDate(a.modificationDate ?? a.creationDate), rect: a.rect };
+  // Group members (RT /Group) just share their parent's comment; they aren't replies.
+  if (!kind || (a.subtype !== "Text" && !text) || (a.inReplyTo && a.replyType === "Group")) return null;
+  return {
+    id: a.id, page, kind, text, author: (a.titleObj?.str ?? "").trim(), date: pdfDate(a.modificationDate ?? a.creationDate), rect: a.rect,
+    ...(a.inReplyTo ? { inReplyTo: a.inReplyTo } : {}), replies: [],
+  };
 }
 
 export async function collectNotes(pdf: PDFDocumentProxy, stale: () => boolean): Promise<NoteEntry[] | null> {
@@ -48,5 +54,23 @@ export async function collectNotes(pdf: PDFDocumentProxy, stale: () => boolean):
     for (const a of annots) { const e = toEntry(a, p); if (e) page.push(e); }
     out.push(...page.sort((x, y) => y.rect[3] - x.rect[3] || x.rect[0] - y.rect[0])); // top to bottom
   }
-  return out;
+  return thread(out);
+}
+
+/** Nest replies under the note they answer (replies to replies join the same thread), oldest first. */
+export function thread(all: NoteEntry[]): NoteEntry[] {
+  const byId = new Map(all.map((n) => [n.id, n]));
+  const root = (n: NoteEntry) => {
+    const seen = new Set<string>();
+    while (n.inReplyTo && byId.has(n.inReplyTo) && !seen.has(n.id)) { seen.add(n.id); n = byId.get(n.inReplyTo)!; }
+    return n;
+  };
+  const top: NoteEntry[] = [];
+  for (const n of all) {
+    const r = n.inReplyTo ? root(n) : n;
+    if (r === n) top.push(n);
+    else r.replies.push(n);
+  }
+  for (const n of top) n.replies.sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0));
+  return top;
 }

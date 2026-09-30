@@ -265,7 +265,12 @@ test("notes tab lists notes and jumps to them", async ({ page }) => {
   await page.getByRole("button", { name: "Add note" }).last().click();
   await expect(page.locator(".note-item")).toHaveCount(1);
   await expect(page.locator(".note-item")).toContainText("Page 1 · Note · Ana Łucja");
+  await page.locator(".textAnnotation").click();
+  await page.getByRole("textbox", { name: "Reply" }).fill("A reply");
+  await page.locator("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.locator(".note-item .note-reply")).toContainText("A reply");
+  await expect(page.locator(".textAnnotation:visible")).toHaveCount(1); // one icon per thread
   await page.keyboard.press("Escape");
   await page.locator(".note-item").click();
-  await expect(page.locator(".popupAnnotation").first()).toContainText("Listed note");
+  await expect(page.locator(".popupAnnotation:visible").first()).toContainText("Listed note");
 });

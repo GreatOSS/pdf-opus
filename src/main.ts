@@ -757,6 +757,14 @@ function updateUndoButtons() {
 }
 // Form fields without a tooltip would be announced by their internal names; use the printed label instead.
 eventBus.on("annotationlayerrendered", async ({ source }: any) => {
+  // Replies sit on the same spot as the note they answer; show one icon per thread (the replies are
+  // listed in the note dialog and the Notes tab).
+  if ((source.div as HTMLElement).querySelector(".textAnnotation")) {
+    for (const a of (await source.pdfPage.getAnnotations()) as any[]) {
+      if (!a.inReplyTo || a.replyType === "Group") continue;
+      source.div.querySelectorAll(`[data-annotation-id="${CSS.escape(a.id)}"], [data-annotation-id="popup_${CSS.escape(a.id)}"]`).forEach((n: HTMLElement) => { n.hidden = true; n.style.display = "none"; });
+    }
+  }
   const controls = [...(source.div as HTMLElement).querySelectorAll<HTMLElement>(".annotationLayer :is(input, textarea, select)[data-element-id]")]
     .filter((c) => !c.getAttribute("aria-label") && !c.title);
   if (!controls.length) return;
@@ -840,7 +848,7 @@ function renderToolOptions(toolId: string) {
     toolText: { colors: palette, size: ["Size", 6, 72, 14], hint: "Click anywhere on a page to add text." },
     toolDraw: { colors: palette, size: ["Thickness", 1, 20, 3], opacity: true, hint: "Drag on a page to draw." },
     toolSign: { colors: [], hint: "Click on a page to place your signature. Drag to move it, drag a corner to resize." },
-    toolNote: { colors: [], hint: "Click on a page to add a sticky note. Click a note to change or delete it." },
+    toolNote: { colors: [], hint: "Click on a page to add a sticky note. Click a note to reply, change or delete it." },
     toolEdit: { colors: [], hint: "Click any line of text to change it. Enter to apply, Esc to cancel." },
     toolRedact: { colors: [], hint: "Drag over anything you want to remove permanently — text underneath is deleted, not just covered." },
     toolImage: { colors: [], hint: "Choose an image, then drag it where you want. Click on a page to add another." },
@@ -1003,23 +1011,43 @@ container.addEventListener("focusout", (e) => {
 });
 
 // ───────────────────────────── Sticky notes ─────────────────────────────
-async function noteDialog(title: string, text: string, canDelete: boolean): Promise<string | null | undefined> {
-  const area = el("textarea", { className: "text-input note-text", rows: 6, value: text, ariaLabel: "Note" }) as HTMLTextAreaElement;
-  // Ctrl/⌘+Enter saves; plain Enter makes a new line.
-  area.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); area.form?.requestSubmit(); } });
-  setTimeout(() => area.focus(), 0);
-  // New notes carry the author's name (shown by every PDF app); remembered on this device.
+type NoteReply = { author: string; date: Date | null; text: string };
+/** Add a note, or view/edit one with its replies. Resolves to null when cancelled. */
+async function noteDialog(o: { title: string; text: string; existing: boolean; replies?: NoteReply[] }): Promise<{ delete: true } | { text: string; reply: string } | null> {
+  const submitOnCtrlEnter = (a: HTMLTextAreaElement) =>
+    a.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); a.form?.requestSubmit(); } });
+  const area = el("textarea", { className: "text-input note-text", rows: 6, value: o.text, ariaLabel: "Note" }) as HTMLTextAreaElement;
+  submitOnCtrlEnter(area);
+  // New notes and replies carry the author's name (shown by every PDF app); remembered on this device.
   const name = el("input", { type: "text", className: "text-input", value: localStorage.getItem("leaflark.author") ?? "", placeholder: "Optional", autocomplete: "name", maxLength: 80 }) as HTMLInputElement;
-  const body = el("div", { className: "stamp-form note-form" }, canDelete ? [area] : [area, el("label", { className: "form-row" }, [el("span", { textContent: "Your name" }), name])]);
+  const parts: HTMLElement[] = [area];
+  let reply: HTMLTextAreaElement | null = null;
+  if (o.existing) {
+    area.rows = 3;
+    area.classList.add("compact");
+    const when = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+    if (o.replies?.length) parts.push(el("ul", { className: "note-thread", ariaLabel: "Replies" }, o.replies.map((r) =>
+      el("li", {}, [el("span", { className: "note-meta", textContent: [r.author || "Reply", r.date ? when.format(r.date) : ""].filter(Boolean).join(" · ") }), el("span", { className: "note-body", textContent: r.text })]))));
+    reply = el("textarea", { className: "text-input note-text reply", rows: 2, placeholder: "Write a reply…", ariaLabel: "Reply" }) as HTMLTextAreaElement;
+    submitOnCtrlEnter(reply);
+    parts.push(reply);
+  }
+  parts.push(el("label", { className: "form-row" }, [el("span", { textContent: "Your name" }), name]));
+  setTimeout(() => (o.existing && o.replies?.length ? reply! : area).focus(), 0);
   const r = await showDialog<string>({
-    title, body,
-    buttons: [...(canDelete ? [{ label: "Delete note", value: "delete" }] : []), { label: "Cancel", value: "cancel" }, { label: canDelete ? "Save" : "Add note", value: "ok", primary: true }],
+    title: o.title, body: el("div", { className: "stamp-form note-form" }, parts),
+    buttons: [...(o.existing ? [{ label: "Delete note", value: "delete" }] : []), { label: "Cancel", value: "cancel" }, { label: o.existing ? "Save" : "Add note", value: "ok", primary: true }],
   });
-  if (r === "delete") return null;
-  if (r !== "ok") return undefined;
-  if (!canDelete) localStorage.setItem("leaflark.author", name.value.trim());
-  return area.value.trim() || (canDelete ? null : undefined);
+  if (r === "delete") return { delete: true };
+  if (r !== "ok") return null;
+  const replyText = reply?.value.trim() ?? "";
+  if (!o.existing || replyText) localStorage.setItem("leaflark.author", name.value.trim());
+  return { text: area.value.trim(), reply: replyText };
 }
+// With the Note tool, clicking a note opens our dialog; keep pdf.js from also toggling its popup.
+container.addEventListener("click", (e) => {
+  if (activeToolId === "toolNote" && (e.target as HTMLElement).closest?.(".textAnnotation")) e.stopPropagation();
+}, true);
 container.addEventListener("pointerdown", async (e) => {
   if (activeToolId !== "toolNote" || e.button !== 0 || !doc) return;
   const pageEl = (e.target as HTMLElement).closest?.(".page") as HTMLElement | null;
@@ -1030,22 +1058,35 @@ container.addEventListener("pointerdown", async (e) => {
   const view = viewer.getPageView(idx);
   if (!view?.viewport) return;
   const notes = await import("./notes");
+  const author = () => localStorage.getItem("leaflark.author") ?? "";
   const existing = (e.target as HTMLElement).closest(".textAnnotation") as HTMLElement | null;
   const id = existing?.dataset.annotationId;
   if (id) {
-    const annots = await (await doc.pdf.getPage(idx + 1)).getAnnotations();
-    const a = annots.find((x: any) => x.id === id);
-    const author = (a?.titleObj?.str ?? "").trim();
-    const text = await noteDialog(author ? `Note by ${author}` : "Note", a?.contentsObj?.str ?? "", true);
-    if (text === undefined || text === (a?.contentsObj?.str ?? "")) return;
-    mutatePages(text === null ? "Deleting note" : "Updating note", (b) => notes.updateNote(b, idx, id, text, crypt()), idx + 1, true);
+    const { toEntry, thread } = await import("./notelist");
+    const entries = (await (await doc.pdf.getPage(idx + 1)).getAnnotations()).map((a: any) => toEntry(a, idx + 1)).filter((x: any) => x);
+    const note = thread(entries as any).find((n) => n.id === id);
+    const old = note?.text ?? "";
+    const res = await noteDialog({ title: note?.author ? `Note by ${note.author}` : "Note", text: old, existing: true, replies: note?.replies });
+    if (!res) return;
+    if ("delete" in res || (!res.text && !res.reply)) {
+      if (note?.replies.length && !(await confirmDialog({ title: "Delete note?", message: `Its ${note.replies.length === 1 ? "reply" : `${note.replies.length} replies`} will be deleted too.`, okLabel: "Delete", danger: true }))) return;
+      mutatePages("Deleting note", (b) => notes.updateNote(b, idx, id, null, crypt()), idx + 1, true);
+      return;
+    }
+    const edit = res.text && res.text !== old;
+    if (!edit && !res.reply) return;
+    mutatePages(res.reply ? "Replying" : "Updating note", async (b) => {
+      if (edit) b = await notes.updateNote(b, idx, id, res.text, crypt());
+      if (res.reply) b = await notes.addReply(b, idx, id, res.reply, { ...crypt(), author: author() });
+      return b;
+    }, idx + 1, true);
     return;
   }
   const r = pageEl.getBoundingClientRect();
   const pt = view.viewport.convertToPdfPoint(e.clientX - r.left - pageEl.clientLeft, e.clientY - r.top - pageEl.clientTop) as [number, number];
-  const text = await noteDialog("Add note", "", false);
-  if (!text) return;
-  mutatePages("Adding note", (b) => notes.addNote(b, idx, pt, text, { ...crypt(), author: localStorage.getItem("leaflark.author") ?? "" }), idx + 1, true);
+  const res = await noteDialog({ title: "Add note", text: "", existing: false });
+  if (!res || "delete" in res || !res.text) return;
+  mutatePages("Adding note", (b) => notes.addNote(b, idx, pt, res.text, { ...crypt(), author: author() }), idx + 1, true);
 }, true);
 
 // ───────────────────────────── Redaction ─────────────────────────────
@@ -1354,6 +1395,10 @@ async function loadNotes() {
     ]) as HTMLButtonElement;
     b.onclick = () => goToNote(n.page, n.id, n.rect);
     root.append(b);
+    for (const rp of n.replies) b.append(el("span", { className: "note-reply" }, [
+      el("span", { className: "note-meta", textContent: [rp.author || "Reply", rp.date ? when.format(rp.date) : ""].filter(Boolean).join(" · ") }),
+      el("span", { className: "note-body", textContent: rp.text }),
+    ]));
   }
 }
 function goToNote(page: number, id: string, rect: number[]) {
