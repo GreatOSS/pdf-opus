@@ -121,6 +121,7 @@ $("#app").innerHTML = `
 <div id="menu" class="menu" role="menu" hidden>
   <button role="menuitem" id="miOpen">Open…</button>
   <button role="menuitem" id="miSaveAs">Save as…</button>
+  <button role="menuitem" id="miPrint">Print…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
   <button role="menuitem" id="miStamp">Page numbers & watermark…</button>
   <button role="menuitem" id="miCompress">Reduce file size…</button>
@@ -1273,7 +1274,7 @@ function toggleMenu(force?: boolean) {
 document.addEventListener("pointerdown", (e) => { if (!menu.hidden && !menu.contains(e.target as Node) && !$("#btnMore").contains(e.target as Node)) toggleMenu(false); });
 menu.addEventListener("click", () => toggleMenu(false));
 menu.addEventListener("keydown", (e) => {
-  const items = [...menu.querySelectorAll("button")];
+  const items = [...menu.querySelectorAll("button")].filter((b) => b.getClientRects().length); // skip items hidden at this width
   const i = items.indexOf(document.activeElement as HTMLButtonElement);
   if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
   if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
@@ -1297,6 +1298,7 @@ on("#btnTheme0", toggleTheme);
 on("#miTheme", toggleTheme);
 on("#miOpen", pickAndOpen);
 on("#miSaveAs", () => save(true));
+on("#miPrint", print);
 on("#miExtract", extractDialog);
 on("#miMerge", () => doc && insertPdfAt(doc.pdf.numPages));
 on("#miSpread", () => { viewer.spreadMode = viewer.spreadMode === 1 ? 0 : 1; });

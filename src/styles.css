@@ -160,7 +160,8 @@ kbd { font: 12px ui-monospace, monospace; padding: 2px 6px; border: 1px solid va
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 .print-frame { position: fixed; width: 1px; height: 1px; border: 0; left: -10px; top: -10px; }
 
-/* Narrow screens */
+/* Narrow screens: Print moves from the toolbar into the More menu. */
+@media (min-width: 1101px) { #miPrint { display: none; } }
 @media (max-width: 1100px) {
   .doc-title { display: none; }
   #btnPrint { display: none; }

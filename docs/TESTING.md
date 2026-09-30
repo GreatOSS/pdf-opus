@@ -185,6 +185,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Find & mark across text pieces
 - Find & mark only matched inside a single pdf.js text item, so a phrase the PDF splits (font change, separate space item, kerning) was missed, and the user could think every occurrence was marked. Items on the same baseline are now joined into lines (whitespace collapsed, a space inferred for word gaps); a match gets one mark per piece; the toast counts matches, not pieces. Hands-on: generated PDF “Account number:” + “ ” + bold “4417 1234” → “number: 4417”: 1 match (3 areas), applied + saved → pdftotext “Account ⎵ 1234 (primary)”; “4417 1234” on consecutive lines is (correctly) not matched. Regression: tracemonkey “trace” still 416 on 14 pages; W-9 “taxpayer identification number” 5 on 3 pages. unit 43/43.
 
+### 2026-09-30 — Phone pass: Print was unreachable
+- 390×844 touch: open W-9, toolbar, bottom tool bar (8 tools incl. Redact), More menu — clean, no errors. Found: the Print button is hidden below 1100 px with no other way in (phones, tablets, narrow windows; only Ctrl+P). Added “Print…” to the More menu, shown only at those widths; menu arrow keys now skip hidden items. Verified: 390 px → More → Print… closes the menu and creates the print frame; 1280 px → item hidden, ArrowDown from “Save as…” lands on “Extract pages…”.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
