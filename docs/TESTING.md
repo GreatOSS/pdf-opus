@@ -164,6 +164,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Redaction erases image pixels
 - Dropped a generated 800×600 JPEG with “SECRET 123-45-6789” → marked the text band → Redact: toast “1 image erased underneath”; saved; `pdfimages -png` of the saved file shows the band black *in the image itself*, text gone. Unit tests: Flate RGB with and without PNG predictor (only covered pixels zeroed, a second page sharing the image keeps the original), undecodable image → removed whole, images outside marks untouched. Confirm dialog no longer says images are only covered.
 
+### 2026-09-30 — Redact: Find & mark
+- New “Find & mark…” in the Redact tool marks every (case-insensitive) occurrence. w9 “taxpayer”: 12 marks on 5 pages → applied → pdftotext: 0 left (was 12). First version estimated extents with equal-width characters and left a stray “r” of a bold “Taxpayer” → now uses proportional widths from canvas text measurement (item's font family) scaled to pdf.js's item width, plus 0.4-char padding; re-run: no fragments, neighbours (“Identification Number (TIN)”) intact. tracemonkey “trace”: 416 → 0; substring semantics (“traces” keeps its “s”). Limits: matches spanning two text items and rotated text aren't found (rotated ones are counted and reported).
+
 ### Known gaps / next
 - Redaction: inline images (BI…EI) aren't handled yet; JBIG2/CCITT images under a mark are removed whole. Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).

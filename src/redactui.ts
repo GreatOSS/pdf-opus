@@ -77,5 +77,6 @@ export function setupRedact(ctx: Ctx) {
   return {
     marks: () => marks.slice(),
     clear() { marks = []; changed(); },
+    add(more: RedactionMark[]) { marks.push(...more); changed(); },
   };
 }

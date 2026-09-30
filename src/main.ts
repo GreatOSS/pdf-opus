@@ -713,6 +713,9 @@ function renderToolOptions(toolId: string) {
   }
   if (toolId === "toolRedact") {
     const n = redact.marks().length;
+    const find = el("button", { className: "text-btn", type: "button", textContent: "Find & mark…", title: "Mark every occurrence of a word or number" }) as HTMLButtonElement;
+    find.onclick = findAndMark;
+    box.append(find);
     if (n) {
       const clear = el("button", { className: "text-btn", type: "button", textContent: "Clear marks" }) as HTMLButtonElement;
       clear.onclick = () => redact.clear();
@@ -847,6 +850,25 @@ function expandToAllPages(marks: { pageIndex: number; rect: [number, number, num
   }
   return out;
 }
+/** Mark every occurrence of a phrase (e.g. a name or account number) for redaction. */
+async function findAndMark() {
+  if (!doc) return;
+  const pdf = doc.pdf;
+  const query = await promptDialog({ title: "Find & mark", message: "Mark every occurrence of (not case-sensitive):", value: ($("#findInput") as HTMLInputElement).value, okLabel: "Mark all",
+    validate: (v) => (v.trim() ? null : "Type a word, name or number.") });
+  if (query == null || doc?.pdf !== pdf) return;
+  showLoading("Searching…");
+  try {
+    const { marks, skipped } = await (await import("./findmarks")).findMarks(pdf, query.trim());
+    if (doc?.pdf !== pdf) return;
+    if (!marks.length) { toast(skipped ? `“${query.trim()}” only appears in rotated text, which can’t be marked automatically yet — mark it by hand.` : `No matches for “${query.trim()}”.`, skipped ? "error" : "info"); return; }
+    redact.add(marks);
+    const pages = new Set(marks.map((m) => m.pageIndex)).size;
+    viewer.currentPageNumber = marks[0].pageIndex + 1;
+    toast(`Marked ${marks.length} match${marks.length === 1 ? "" : "es"} on ${pages} page${pages === 1 ? "" : "s"}. Check them, then apply.${skipped ? ` ${skipped} in rotated text weren’t marked.` : ""}`);
+  } finally { hideLoading(); }
+}
+
 async function applyRedactionMarks() {
   const marks = redact.marks();
   if (!marks.length || !doc) return;
