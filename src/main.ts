@@ -264,6 +264,8 @@ async function openBytes(bytes: Uint8Array, name: string, handle: FileHandle | n
   (($("#pageInput") as HTMLInputElement).value = "1");
   updateTitle();
   thumbs.setDocument(pdf, keep ? thumbs.selectionAfterReload : undefined);
+  // After an edit (keep), sections the user had expanded stay expanded.
+  if (!keep) outlineOpen.clear();
   loadOutline(pdf);
   notesFor = null;
   if (!$("#notesPanel").hidden) void loadNotes();
@@ -1350,11 +1352,30 @@ container.addEventListener("wheel", (e) => {
 }, { passive: false });
 
 // ───────────────────────────── Outline ─────────────────────────────
+/** Index paths ("0/2") of outline entries the user expanded, kept across edits of the same document. */
+const outlineOpen = new Set<string>();
+/** Entries after a deleted one move up by one; forget the deleted subtree. */
+function shiftOpenAfterDelete(path: number[]) {
+  const depth = path.length - 1, parent = path.slice(0, depth).join("/");
+  const moved = [...outlineOpen].map((k) => {
+    const p = k.split("/").map(Number);
+    if (p.length <= depth || p.slice(0, depth).join("/") !== parent) return k;
+    if (p[depth] === path[depth]) return null;
+    if (p[depth] > path[depth]) p[depth]--;
+    return p.join("/");
+  });
+  outlineOpen.clear();
+  moved.forEach((k) => k && outlineOpen.add(k));
+  if (doc) loadOutline(doc.pdf);
+}
+let outlineSeq = 0;
 async function loadOutline(pdf: PDFDocumentProxy) {
   const root = $("#outline");
-  root.replaceChildren();
+  const seq = ++outlineSeq;
   const outline = await pdf.getOutline().catch(() => null);
-  if (doc?.pdf !== pdf) return;
+  // Only the latest load renders (overlapping loads would otherwise both append).
+  if (doc?.pdf !== pdf || seq !== outlineSeq) return;
+  root.replaceChildren();
   if (!outline?.length) {
     root.append(el("p", { className: "empty", textContent: "No bookmarks yet. Use Add bookmark to mark the spot you're reading." }));
     return;
@@ -1367,7 +1388,12 @@ async function loadOutline(pdf: PDFDocumentProxy) {
       const row = el("div", { className: "outline-row" });
       if (it.items?.length) {
         const tw = el("button", { className: "twisty", type: "button", ariaLabel: "Expand", ariaExpanded: "false" }) as HTMLButtonElement;
-        tw.onclick = () => { const open = li.classList.toggle("open"); tw.ariaExpanded = String(open); delete li.dataset.auto; };
+        const key = path.join("/");
+        tw.onclick = () => {
+          const open = li.classList.toggle("open"); tw.ariaExpanded = String(open); delete li.dataset.auto;
+          if (open) outlineOpen.add(key); else outlineOpen.delete(key);
+        };
+        if (outlineOpen.has(key)) { li.classList.add("open"); tw.ariaExpanded = "true"; }
         row.append(tw);
       } else row.append(el("span", { className: "twisty-space" }));
       const a = el("a", { href: "#", textContent: it.title || "(untitled)" }) as HTMLAnchorElement;
@@ -1388,7 +1414,8 @@ async function loadOutline(pdf: PDFDocumentProxy) {
       const del = el("button", { className: "icon-btn bm-act", type: "button", title: "Delete", ariaLabel: `Delete “${title}”`, innerHTML: icons.trash }) as HTMLButtonElement;
       del.onclick = async () => {
         if (it.items?.length && !(await confirmDialog({ title: "Delete bookmark?", message: `“${title}” and the ${it.items.length === 1 ? "bookmark" : `${it.items.length} bookmarks`} inside it will be deleted.`, okLabel: "Delete", danger: true }))) return;
-        mutatePages("Deleting bookmark", async (b) => (await import("./bookmarks")).deleteBookmark(b, path, crypt()), undefined, true);
+        const ok = await mutatePages("Deleting bookmark", async (b) => (await import("./bookmarks")).deleteBookmark(b, path, crypt()), undefined, true);
+        if (ok) shiftOpenAfterDelete(path);
       };
       row.append(a, ren, del);
       li.append(row);

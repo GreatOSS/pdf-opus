@@ -378,3 +378,15 @@ test("bookmarks can be added, renamed and deleted", async ({ page }) => {
   await page.getByRole("button", { name: "Delete “Renamed”" }).click();
   await expect(page.locator("#outline")).toContainText("No bookmarks yet");
 });
+
+test("editing a nested outline keeps it intact and expanded", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#fileInput").setInputFiles(new URL("./fixtures/outlined.pdf", import.meta.url).pathname);
+  await page.locator("#tabOutline").click();
+  await expect(page.locator("#outline a").first()).toHaveText("Chapter 1");
+  await page.locator("#outline .twisty").first().click();
+  await page.getByRole("button", { name: "Delete “Section 1.1”" }).click({ force: true });
+  await expect(page.locator("#outline a")).toHaveText(["Chapter 1", "Section 1.2", "Chapter 2 (closed)", "Section 2.1", "Appendix"]);
+  await expect(page.locator("#outline li.open")).toHaveCount(1); // Chapter 1 stays expanded
+  await expect(page.getByText("Section 1.2")).toBeVisible();
+});
