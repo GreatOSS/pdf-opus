@@ -29,7 +29,9 @@
   "dependencies": {
     "@cantoo/fontkit": "^2.0.12",
     "@cantoo/pdf-lib": "^2.11.1",
-    "pdfjs-dist": "^6.3.289"
+    "@tesseract.js-data/eng": "^1.0.0",
+    "pdfjs-dist": "^6.3.289",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -170,6 +170,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Reduce file size
 - New More → “Reduce file size…” (Balanced: long edge ≤2600 px, JPEG q0.82; Smallest: ≤1600 px, q0.7). Dropped a generated 4000×3000 noisy JPEG (6.1 MB PDF) → Balanced → “Reduced from 6.1 MB to 874 KB (1 image recompressed)”; saved: pdfimages shows 2600×1950 JPEG, Poppler render looks right. tracemonkey (no photos) → 1.0 MB → 964 KB from object streams alone. Lossless (Flate) images are only downscaled, never turned into JPEG; CMYK JPEGs, masks, Decode arrays are left alone; an image is only replaced if ≥10% smaller; the whole step is undoable.
 
+### 2026-09-30 — OCR
+- New More → “Recognize text (OCR)…” (tesseract.js 7, LSTM, English; engine + data served from /ocr, ~7 MB, fetched on first use, not precached). Scan test: W-9 p1 rendered to PNG at 150 dpi → opened as image PDF → OCR: dialog says 1 page looks like a scan; ~8 s; 916 words; Find “Taxpayer” → 1 of 3; saved → pdftotext gives the text (903 words vs 933 in the original page; e.g. “Mame” for “Name”). Placement tuned in three rounds: baseline at word bottom (7pt low) → line baseline (title too tall: the line included the big “W-9”) → per-word size/baseline from ascender/descender classes: highlights now sit on the words (within ~2–3pt). Limits: English only; non-WinAnsi letters in results become “?”; no cancel button during OCR.
+
 ### Known gaps / next
 - Redaction: inline images (BI…EI) aren't handled yet; JBIG2/CCITT images under a mark are removed whole. Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).

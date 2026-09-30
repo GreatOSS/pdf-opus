@@ -124,6 +124,7 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miExtract">Extract pages…</button>
   <button role="menuitem" id="miStamp">Page numbers & watermark…</button>
   <button role="menuitem" id="miCompress">Reduce file size…</button>
+  <button role="menuitem" id="miOcr">Recognize text (OCR)…</button>
   <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <hr />
   <button role="menuitem" id="miSpread">Two-page view</button>
@@ -882,6 +883,34 @@ async function compressDialog() {
   else toast(`This file is already compact — nothing worth shrinking (${mb(r.before)}).`);
 }
 
+/** Make scanned pages searchable: recognise their text and add it as an invisible layer. */
+async function ocrDialog() {
+  if (!doc) return;
+  const pdf = doc.pdf;
+  showLoading("Looking for scanned pages…");
+  let pages: number[];
+  try { pages = await (await import("./ocr")).pagesNeedingOcr(pdf); } finally { hideLoading(); }
+  if (doc?.pdf !== pdf) return;
+  if (!pages.length) { toast("Every page already has selectable text — no OCR needed."); return; }
+  const n = pdf.numPages;
+  const ok = await showDialog({
+    title: "Recognize text (OCR)",
+    message: `${pages.length === n ? (n === 1 ? "This page looks" : `All ${n} pages look`) : `${pages.length} of ${n} pages look`} like ${pages.length === 1 ? "a scan" : "scans"} without selectable text. Leaflark can recognize the text so you can search, select and copy it. It runs on this device — nothing is uploaded. The first time, it downloads the English text engine (about 7 MB).`,
+    buttons: [{ label: "Cancel", value: false }, { label: "Recognize text", value: true, primary: true }],
+  });
+  if (!ok) return;
+  let words = 0;
+  const done = await mutatePages("Recognizing text", async (b) => {
+    const r = await (await import("./ocr")).ocrDocument(pdf, b, pages, crypt(), ({ page, pages: total, status, progress }) => {
+      showLoading(page ? `Recognizing text… page ${page} of ${total} (${Math.round(progress * 100)}%)` : `Preparing text recognition… ${status === "loading language traineddata" ? `${Math.round(progress * 100)}%` : ""}`);
+    }, { cancelled: false });
+    words = r.words;
+    if (!words) throw new Error("No text was recognized on these pages");
+    return r.bytes;
+  }, viewer.currentPageNumber, true);
+  if (done) toast(`Recognized ${words} words on ${pages.length} page${pages.length === 1 ? "" : "s"} — you can now search and select the text. Save to keep it.`);
+}
+
 /** Mark every occurrence of a phrase (e.g. a name or account number) for redaction. */
 async function findAndMark() {
   if (!doc) return;
@@ -1259,6 +1288,7 @@ on("#miSpread", () => { viewer.spreadMode = viewer.spreadMode === 1 ? 0 : 1; });
 on("#miProps", showProperties);
 on("#miStamp", stampDialog);
 on("#miCompress", compressDialog);
+on("#miOcr", ocrDialog);
 on("#miShortcuts", showShortcuts);
 on("#miClose", closeDocument);
 on("#pgRotL", () => rotatePages(thumbs.selected(), -90));
