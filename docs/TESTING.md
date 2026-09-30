@@ -282,6 +282,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Firefox + iPhone (WebKit): redaction, flatten, save (production build)
 - f1040 on `vite preview` (CSP active), Firefox desktop and iPhone 14 touch emulation: typed “Ana Pass” → Redact → Find & mark “Treasury” → Apply 1 redaction → Flatten (“Flattened 199 form fields.”, no inputs left) → Save. Both files: pdfinfo “Form: none”, pdftotext finds “Ana Pass” and no “Treasury”; render shows the black box and the value drawn into the page. No page errors. No changes needed.
 
+### 2026-09-30 — Bookmarks: add, rename, delete
+- Outline tab: “Add bookmark” (current page and scroll position, /XYZ dest; name suggested from the page's biggest heading, else “Page N”), and rename/delete buttons on each bookmark (on hover; always shown on touch). Written as a standard outline (First/Last/Prev/Next/Parent relinked, Counts recomputed, empty outline removed); undoable. tracemonkey (no outline): empty state → bookmarks on p5 (“Results — Zoë”) and p9 → from p1 clicking the first jumps to p5 → rename → delete → undo restores both; no page errors. Found: the first version suggested the page's first text item (“resentations are assigned an integer key…”, mid-sentence) → now the heading if one stands out (p1: the paper title; p5/p9: “Page N”). New unit (pdf.js reads the result) + e2e (3 engines): unit 67/67, e2e 66/66.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; text drawn rotated within the page (not via page rotation) isn't editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

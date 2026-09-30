@@ -94,7 +94,10 @@ $("#app").innerHTML = `
       </div>
       <div id="thumbs" class="thumbs" role="listbox" aria-multiselectable="true" aria-label="Pages" tabindex="0"></div>
     </div>
-    <div id="outlinePanel" class="panel" hidden><div id="outline" class="outline"></div></div>
+    <div id="outlinePanel" class="panel" hidden>
+      <div class="page-actions outline-actions"><button id="bmAdd" class="text-btn" type="button" title="Bookmark the spot you're reading">${icons.plus}<span>Add bookmark</span></button></div>
+      <div id="outline" class="outline"></div>
+    </div>
     <div id="notesPanel" class="panel" hidden><div id="notesList" class="notes-list" aria-live="polite"></div></div>
     <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
   </aside>
@@ -1304,7 +1307,9 @@ eventBus.on("pagechanging", ({ pageNumber }: { pageNumber: number }) => {
   highlightOutline(pageNumber);
 });
 // Within a page, follow the section at the top of the view as the user scrolls.
+let viewTop: { page: number; top: number | null } = { page: 1, top: null };
 eventBus.on("updateviewarea", ({ location }: { location: { pageNumber: number; top: number } }) => {
+  viewTop = { page: location.pageNumber, top: Number.isFinite(location.top) ? location.top : null };
   if (outlinePages.length) highlightOutline(location.pageNumber, location.top);
 });
 pageInput.addEventListener("change", () => {
@@ -1351,12 +1356,13 @@ async function loadOutline(pdf: PDFDocumentProxy) {
   const outline = await pdf.getOutline().catch(() => null);
   if (doc?.pdf !== pdf) return;
   if (!outline?.length) {
-    root.append(el("p", { className: "empty", textContent: "This document has no outline." }));
+    root.append(el("p", { className: "empty", textContent: "No bookmarks yet. Use Add bookmark to mark the spot you're reading." }));
     return;
   }
-  const build = (items: any[]): HTMLElement => {
+  const build = (items: any[], parentPath: number[] = []): HTMLElement => {
     const ul = el("ul", { role: "group" });
-    for (const it of items) {
+    for (const [i, it] of items.entries()) {
+      const path = [...parentPath, i];
       const li = el("li", { role: "treeitem" });
       const row = el("div", { className: "outline-row" });
       if (it.items?.length) {
@@ -1372,9 +1378,21 @@ async function loadOutline(pdf: PDFDocumentProxy) {
         if (it.dest) linkService.goToDestination(it.dest);
         else if (it.url) window.open(it.url, "_blank", "noopener");
       };
-      row.append(a);
+      const title = it.title || "(untitled)";
+      const ren = el("button", { className: "icon-btn bm-act", type: "button", title: "Rename", ariaLabel: `Rename “${title}”`, innerHTML: icons.editText }) as HTMLButtonElement;
+      ren.onclick = async () => {
+        const t = await promptDialog({ title: "Rename bookmark", message: "", value: it.title ?? "", okLabel: "Rename", validate: (v) => (v.trim() ? null : "Enter a name.") });
+        if (t === null || t.trim() === it.title) return;
+        mutatePages("Renaming bookmark", async (b) => (await import("./bookmarks")).renameBookmark(b, path, t.trim(), crypt()), undefined, true);
+      };
+      const del = el("button", { className: "icon-btn bm-act", type: "button", title: "Delete", ariaLabel: `Delete “${title}”`, innerHTML: icons.trash }) as HTMLButtonElement;
+      del.onclick = async () => {
+        if (it.items?.length && !(await confirmDialog({ title: "Delete bookmark?", message: `“${title}” and the ${it.items.length === 1 ? "bookmark" : `${it.items.length} bookmarks`} inside it will be deleted.`, okLabel: "Delete", danger: true }))) return;
+        mutatePages("Deleting bookmark", async (b) => (await import("./bookmarks")).deleteBookmark(b, path, crypt()), undefined, true);
+      };
+      row.append(a, ren, del);
       li.append(row);
-      if (it.items?.length) li.append(build(it.items));
+      if (it.items?.length) li.append(build(it.items, path));
       ul.append(li);
     }
     return ul;
@@ -1441,6 +1459,18 @@ function setTab(which: "pages" | "outline" | "notes") {
 $("#tabPages").onclick = () => setTab("pages");
 $("#tabOutline").onclick = () => setTab("outline");
 $("#tabNotes").onclick = () => setTab("notes");
+$("#bmAdd").onclick = async () => {
+  if (!doc) return;
+  const { page, top } = viewTop.page === viewer.currentPageNumber ? viewTop : { page: viewer.currentPageNumber, top: null };
+  // Suggest the page's most prominent heading (text clearly larger than the body), else "Page N".
+  const tc = await (await doc.pdf.getPage(page)).getTextContent().catch(() => null);
+  const { suggestTitle } = await import("./bookmarks");
+  const first = suggestTitle((tc?.items as any[] | undefined) ?? []);
+  const t = await promptDialog({ title: "Add bookmark", message: `Bookmark page ${page} at the spot you're reading.`, value: first ?? `Page ${page}`, okLabel: "Add", validate: (v) => (v.trim() ? null : "Enter a name.") });
+  if (t === null) return;
+  const ok = await mutatePages("Adding bookmark", async (b) => (await import("./bookmarks")).addBookmark(b, page - 1, top, t.trim(), crypt()), undefined, true);
+  if (ok) setTab("outline");
+};
 
 // ───────────────────────────── Notes list ─────────────────────────────
 let notesFor: PDFDocumentProxy | null = null;

@@ -356,3 +356,25 @@ test("flattens form fields and annotations, keeping notes", async ({ page }) => 
     return (await pg.getTextContent()).items.map((i: any) => i.str).join(" ");
   })).toContain("Flat value");
 });
+
+test("bookmarks can be added, renamed and deleted", async ({ page }) => {
+  await open(page, 3);
+  await page.locator("#tabOutline").click();
+  await expect(page.locator("#outline")).toContainText("No bookmarks yet");
+  await page.locator("#pageInput").fill("2");
+  await page.locator("#pageInput").press("Enter");
+  await page.locator("#bmAdd").click();
+  await page.locator("dialog input").fill("Second page");
+  await page.locator("dialog").getByRole("button", { name: "Add" }).click();
+  await expect(page.locator("#outline a")).toHaveText(["Second page"]);
+  await page.locator("#pageInput").fill("1");
+  await page.locator("#pageInput").press("Enter");
+  await page.locator("#outline a").click();
+  await expect(page.locator("#pageInput")).toHaveValue("2");
+  await page.getByRole("button", { name: "Rename “Second page”" }).click();
+  await page.locator("dialog input").fill("Renamed");
+  await page.locator("dialog").getByRole("button", { name: "Rename" }).click();
+  await expect(page.locator("#outline a")).toHaveText(["Renamed"]);
+  await page.getByRole("button", { name: "Delete “Renamed”" }).click();
+  await expect(page.locator("#outline")).toContainText("No bookmarks yet");
+});

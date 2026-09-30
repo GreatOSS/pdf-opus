@@ -316,3 +316,10 @@ body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }
 .annotationLayer .popup-replies { margin-top: 6px; border-top: 1px solid rgba(0, 0, 0, .2); padding-top: 4px; display: flex; flex-direction: column; gap: 4px; }
 .annotationLayer .popup-reply { display: flex; flex-direction: column; white-space: pre-wrap; }
 .annotationLayer .popup-reply-meta { font-weight: 600; font-size: .9em; }
+.outline-actions { justify-content: flex-start; }
+.outline-actions .text-btn { display: inline-flex; align-items: center; gap: 4px; }
+.outline-actions .text-btn svg { width: 16px; height: 16px; }
+.outline-row .bm-act { width: 24px; height: 24px; flex: none; opacity: 0; }
+.outline-row .bm-act svg { width: 14px; height: 14px; }
+.outline-row:hover .bm-act, .outline-row:focus-within .bm-act { opacity: 1; }
+@media (hover: none) { .outline-row .bm-act { opacity: .7; } }
