@@ -242,6 +242,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Save pages as images
 - More → “Save pages as images…”: current/selected/all pages, PNG or JPEG, 96/150/300 dpi (capped at 8000 px per side); one page → image file, several → ZIP (own store-only writer, UTF-8 names); includes form entries/annotations; progress + Cancel. f1040 with typed “Zoë Imagetest”, current page, PNG 150 dpi → “f1040 - page 1.png” 1275×1650 with the value rendered. tracemonkey all pages, JPEG → “tracemonkey (images).zip” in 0.8 s; `unzip -t`: no errors; 14 files “tracemonkey - page 01.jpg” … valid 1275×1650 JPEGs. Opening another file with unsaved edits correctly asked “Discard unsaved changes?”. unit 57/57.
 
+### 2026-09-30 — Firefox + WebKit: crop, images, dark pages (production build)
+- Both engines on `vite preview` (CSP active), tracemonkey: Crop → auto → “Cropped 14 pages.”; Save pages as images → all, JPEG → “tracemonkey (images).zip”, `unzip -t` OK for both; Dark pages → filter applied, pages render light-on-dark. No page errors. No changes needed.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
