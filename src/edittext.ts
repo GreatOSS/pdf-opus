@@ -54,33 +54,53 @@ export function paragraphOf(run: Run, runs: Run[]): Run[] {
   const alone = (u: Run) => !runs.some((v) => v !== u && Math.abs(v.y - u.y) < s * 0.3 && v.x < u.x + u.width + s * 2 && v.x + v.width > u.x - s * 2);
   if (!alone(run)) return [run];
   const fits = (u: Run) => u.fontName === run.fontName && Math.abs(u.size - s) < 0.5 && Math.abs(u.x - run.x) <= s * 3 && alone(u);
-  let gap = 0;
-  const step = (from: Run, dir: 1 | -1) => {
-    const c = runs.filter((u) => fits(u) && (u.y - from.y) * dir > s * 0.9 && (u.y - from.y) * dir < s * 1.8)
-      .sort((a, b) => Math.abs(a.y - from.y) - Math.abs(b.y - from.y))[0];
-    if (!c) return null;
-    const d = Math.abs(c.y - from.y);
-    if (gap && Math.abs(d - gap) > s * 0.2) return null;
-    gap ||= d;
-    return c;
+  // Walk to neighbouring lines at a constant spacing. Which way we go first decides the spacing
+  // (list items can be spaced wider than lines), so try both and keep the longer paragraph.
+  const walk = (first: 1 | -1) => {
+    let gap = 0;
+    const step = (from: Run, dir: 1 | -1) => {
+      const c = runs.filter((u) => fits(u) && (u.y - from.y) * dir > s * 0.9 && (u.y - from.y) * dir < s * 1.8)
+        .sort((a, b) => Math.abs(a.y - from.y) - Math.abs(b.y - from.y))[0];
+      if (!c) return null;
+      const d = Math.abs(c.y - from.y);
+      if (gap && Math.abs(d - gap) > s * 0.2) return null;
+      gap ||= d;
+      return c;
+    };
+    const block = [run];
+    for (const dir of [first, -first as 1 | -1]) {
+      for (let u = step(run, dir); u; u = step(u, dir)) dir === 1 ? block.unshift(u) : block.push(u);
+    }
+    return splitParagraph(block);
   };
-  const block = [run];
-  for (let u = step(run, 1); u; u = step(u, 1)) block.unshift(u);
-  for (let u = step(run, -1); u; u = step(u, -1)) block.push(u);
+  const a = walk(-1), b = walk(1);
+  return b.length > a.length ? b : a;
+
+  function splitParagraph(block: Run[]): Run[] {
   if (block.length < 2) return [run];
-  const left = Math.min(...block.map((u) => u.x));
   const right = Math.max(...block.map((u) => u.x + u.width));
-  // Split the block into paragraphs; keep the one holding the clicked run.
+  // Width of a line's first word, estimated from its share of the characters.
+  const firstWord = (u: Run) => u.width * ((u.str.trim().split(/\s+/)[0] ?? "").length / Math.max(1, u.str.length));
+  // A new paragraph starts at a list item, after a line that had room left for the next line's first
+  // word, or where the left edge moves after the second line (the first line may be indented or hanging).
+  const startsNew = (i: number, start: number) =>
+    LIST_MARKER.test(block[i].str) ||
+    block[i - 1].x + block[i - 1].width + firstWord(block[i]) + s * 0.3 < right - s * 0.5 ||
+    (i - start >= 2 && Math.abs(block[i].x - block[i - 1].x) > s * 0.5) ||
+    // Indented further than the line above: a new paragraph, unless that line is a list item (hanging indent).
+    (i - start === 1 && block[i].x - block[i - 1].x > s * 0.5 && !LIST_MARKER.test(block[i - 1].str));
   let start = 0;
   for (let i = 1; i <= block.length; i++) {
-    const breaks = i === block.length || block[i].x - left > s * 0.5 || block[i - 1].x + block[i - 1].width < right - s * 2.5;
-    if (!breaks) continue;
+    if (i < block.length && !startsNew(i, start)) continue;
     const para = block.slice(start, i);
     if (para.includes(run)) return para;
     start = i;
   }
   return [run];
+  }
 }
+
+const LIST_MARKER = /^\s*(?:[•◦▪▫‣∙●○■□–—*-]|\(?\d{1,3}[.)]|\(?[a-zA-Z][.)])\s/;
 
 /** Justified: at least three lines, and all but the last end flush with the column's right edge. */
 export function isJustified(para: { x: number; width: number; size: number }[]): boolean {
@@ -234,10 +254,12 @@ export function setupEditText(ctx: Ctx) {
     box.contentEditable = "plaintext-only";
     box.spellcheck = true;
     const multi = para.length > 1;
-    const left = Math.min(...para.map((u) => u.x));
+    // Body lines share a left edge; the first line may be indented, or hang out (bullets).
+    const left = multi ? para[1].x : run.x;
     const colWidth = Math.max(...para.map((u) => u.x + u.width)) - left;
     const lineGap = multi ? (para[0].y - para[para.length - 1].y) / (para.length - 1) : run.size * 1.2;
-    const indent = multi ? Math.max(0, para[0].x - left) : 0;
+    const indent = multi ? para[0].x - left : 0;
+    const boxLeft = Math.min(left, para[0].x); // a hanging first line starts left of the body
     const original = multi ? joinLines(para.map((u) => u.str)) : run.str;
     const justify = isJustified(para);
     box.textContent = original;
@@ -246,13 +268,13 @@ export function setupEditText(ctx: Ctx) {
     // run's top-left in PDF space; on rotated pages that corner lands elsewhere on screen.
     const vp = view.viewport;
     const top = multi ? para[0].y + run.size * 0.95 - (lineGap - run.size * 1.2) / 2 : run.y + run.size * 0.95;
-    const [ox, oy] = vp.convertToViewportPoint(multi ? left : run.x, top);
-    const [ux, uy] = vp.convertToViewportPoint((multi ? left : run.x) + 1, top);
+    const [ox, oy] = vp.convertToViewportPoint(multi ? boxLeft : run.x, top);
+    const [ux, uy] = vp.convertToViewportPoint((multi ? boxLeft : run.x) + 1, top);
     const k = Math.hypot(ux - ox, uy - oy); // CSS px per PDF unit
     const w = (multi ? colWidth : run.width) * k, h = run.size * 1.2 * k;
     Object.assign(box.style, multi ? {
-      left: `${ox}px`, top: `${oy}px`, width: `${w + 2}px`, minHeight: `${lineGap * para.length * k}px`, lineHeight: `${lineGap * k}px`,
-      whiteSpace: "pre-wrap", textIndent: `${indent * k}px`, textAlign: justify ? "justify" : "",
+      left: `${ox}px`, top: `${oy}px`, width: `${w + (left - boxLeft) * k + 2}px`, minHeight: `${lineGap * para.length * k}px`, lineHeight: `${lineGap * k}px`,
+      whiteSpace: "pre-wrap", paddingLeft: `${(left - boxLeft) * k}px`, textIndent: `${indent * k}px`, textAlign: justify ? "justify" : "",
     } : {
       left: `${ox}px`, top: `${oy}px`, minWidth: `${w}px`, height: `${h}px`, lineHeight: `${h}px`,
     });
@@ -304,7 +326,7 @@ export function setupEditText(ctx: Ctx) {
       const lastY = para[para.length - 1].y;
       ctx.commit({
         pageIndex: idx,
-        rect: multi ? [left - 0.5, lastY - run.size * 0.25, colWidth + 1, para[0].y - lastY + run.size * 1.2] : [run.x - 0.5, run.y - run.size * 0.25, run.width + 1, run.size * 1.2],
+        rect: multi ? [boxLeft - 0.5, lastY - run.size * 0.25, colWidth + (left - boxLeft) + 1, para[0].y - lastY + run.size * 1.2] : [run.x - 0.5, run.y - run.size * 0.25, run.width + 1, run.size * 1.2],
         x: multi ? left : run.x, y: para[0].y, size: run.size, text, family, bold, italic, color: colors.fg, background: colors.bg,
         align: isCentered ? "center" : "left", original: para.map((u) => u.str).join(""),
         // Ragged text gets a little slack (the replacement font may run slightly wider); justified text fills the column exactly.

@@ -395,3 +395,11 @@ Known limits: text in other fonts than the standard 14 is replaced with the clos
 | Letter (ragged, 3 lines) | Correctly stays left-aligned (not mistaken for justified) |
 | iPhone 14 (WebKit): Edit tool → hint says “Tap any text…”; tap a paragraph line | Box covers the whole paragraph, aligned |
 | Outputs | `qpdf --check` and Ghostscript clean. unit 83/83, e2e 87/87 |
+
+## 2026-09-30 — paragraph detection on real text (IRS W-9 instructions)
+
+| Workflow | Result |
+|---|---|
+| W-9 page 2 (tagged PDF, ragged right, bullet lists, first-line indents): click lines in paragraphs and bullets | **Fixed:** (1) ragged paragraphs were cut after the first shorter line — a paragraph now ends only where the next line’s first word would have fitted; (2) two long bullet items merged — a list marker (•, –, 1., a) …) starts a new paragraph; (3) a bullet’s continuation was lost when clicking the bullet line (list items are spaced wider than lines) — both walking directions are tried; (4) an indented line after a one-line item joined it — indents start a new paragraph unless under a list item (hanging indent) |
+| Edit the 7-line first paragraph and a bullet (longer, with “exchange-traded”) | OK — rewrapped in the W-9’s Helvetica, bullet wraps at its own hyphen; pdftotext correct; `qpdf --check` clean |
+| Regression: tracemonkey abstract, 3-line letter | Still open whole. unit 84/84, e2e 87/87 |

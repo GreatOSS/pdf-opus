@@ -75,6 +75,29 @@ describe("paragraphOf", () => {
     const uneven = [run("one", 54, 700, 200), run("two", 54, 688, 200), run("far", 54, 672, 200)];
     expect(paragraphOf(uneven[0], uneven).map((u) => u.str)).toEqual(["one", "two"]);
   });
+  it("handles ragged text, list items and indents like the IRS W-9 instructions", () => {
+    // Ragged right: line 2 is much shorter than line 1, but the next word wouldn't have fitted on it.
+    const w9 = [
+      run("must obtain your correct taxpayer identification number (TIN), which", 36, 700, 270, 9),
+      run("may be your social security number (SSN), individual taxpayer", 36, 689, 240, 9),
+      run("identification number (ITIN), adoption taxpayer identification number", 36, 678, 268, 9),
+      run("are not limited to, the following.", 36, 667, 130, 9),
+      run("• Form 1099-DIV (dividends, including those from stocks or mutual", 36, 654, 262, 9),
+      run("funds).", 36, 643, 28, 9),
+      run("• Form 1099-K (merchant card and third-party network transactions).", 36, 630, 268, 9),
+      run("• Form 1098 (home mortgage interest), 1098-E (student loan interest),", 36, 617, 266, 9),
+      run("and 1098-T (tuition).", 36, 606, 80, 9),
+      run("Use Form W-9 only if you are a U.S. person (including a resident", 44, 593, 255, 9),
+      run("alien), to provide your correct TIN.", 36, 582, 140, 9),
+    ];
+    const p = (i: number) => paragraphOf(w9[i], w9).map((u) => w9.indexOf(u));
+    expect(p(1)).toEqual([0, 1, 2, 3]);
+    expect(p(4)).toEqual([4, 5]);
+    expect(p(5)).toEqual([4, 5]);
+    expect(p(6)).toEqual([6]);
+    expect(p(7)).toEqual([7, 8]);
+    expect(p(9)).toEqual([9, 10]);
+  });
   it("joins lines, rejoining hyphenated words", () => {
     expect(joinLines(["more difficult to com-", "pile than ", " others"])).toBe("more difficult to compile than others");
     expect(joinLines(["the Java-", "Script engine"])).toBe("the Java-Script engine");
