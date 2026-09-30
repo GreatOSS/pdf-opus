@@ -88,3 +88,42 @@ export async function promptDialog(o: { title: string; message: string; value?: 
   const ok = await p;
   return ok ? input.value : null;
 }
+
+export interface MenuItem { label: string; hint?: string; run: () => void; disabled?: boolean; danger?: boolean }
+let openPopup: (() => void) | null = null;
+/** A small menu anchored to a button; arrow keys move, Esc closes and returns focus. */
+export function popupMenu(anchor: HTMLElement, items: MenuItem[]) {
+  const wasOpen = anchor.ariaExpanded === "true";
+  openPopup?.();
+  if (wasOpen) return; // a second click on the button closes it
+  const menu = el("div", { className: "menu popup-menu", role: "menu" });
+  for (const it of items) {
+    const b = el("button", { type: "button", role: "menuitem", disabled: !!it.disabled, className: it.danger ? "danger" : "" }, [
+      el("span", { textContent: it.label }), ...(it.hint ? [el("kbd", { textContent: it.hint })] : []),
+    ]) as HTMLButtonElement;
+    b.onclick = () => { close(false); it.run(); };
+    menu.append(b);
+  }
+  const close = (refocus: boolean) => {
+    menu.remove(); anchor.ariaExpanded = "false"; openPopup = null;
+    document.removeEventListener("pointerdown", outside, true);
+    if (refocus) anchor.focus();
+  };
+  const outside = (e: Event) => { if (!menu.contains(e.target as Node) && !anchor.contains(e.target as Node)) close(false); };
+  menu.addEventListener("keydown", (e) => {
+    const bs = [...menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+    const i = bs.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); }
+    else if (e.key === "Tab") close(false);
+  });
+  document.body.append(menu);
+  const r = anchor.getBoundingClientRect(), m = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(r.right - m.width, innerWidth - m.width - 8))}px`;
+  menu.style.top = `${r.bottom + m.height + 4 > innerHeight ? Math.max(8, r.top - m.height - 4) : r.bottom + 4}px`;
+  anchor.ariaExpanded = "true";
+  document.addEventListener("pointerdown", outside, true);
+  openPopup = () => close(false);
+  menu.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+}

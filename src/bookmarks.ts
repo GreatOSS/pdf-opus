@@ -2,6 +2,7 @@
 // which matches the order pdf.js's getOutline() returns (First → Next chains).
 import { PDFDocument, PDFName, PDFDict, PDFRef, PDFHexString, PDFNumber, PDFNull } from "@cantoo/pdf-lib";
 import type { CryptOptions } from "./organize";
+export { moveTarget, remapPath, type MoveOp } from "./outlinepath";
 
 const N = (s: string) => PDFName.of(s);
 
@@ -97,6 +98,23 @@ export function deleteBookmark(bytes: Uint8Array, path: number[], { password = "
     relink(doc, parentRef, parent, kids.filter((k) => k !== item));
     const drop = (r: PDFRef, d: PDFDict) => { for (const k of children(doc, d)) drop(k.ref, k.dict); doc.context.delete(r); };
     drop(item.ref, item.dict);
+  });
+}
+
+/** Move a bookmark (with everything nested under it) from `from` to `to`, a path in the tree without it. */
+export function moveBookmark(bytes: Uint8Array, from: number[], to: number[], { password = "" }: CryptOptions = {}) {
+  return edit(bytes, password, (doc, rootRef, root) => {
+    const { parentRef, parent, kids, item } = locate(doc, rootRef, root, from);
+    relink(doc, parentRef, parent, kids.filter((k) => k !== item));
+    let dstRef = rootRef, dst = root;
+    for (const i of to.slice(0, -1)) {
+      const k = children(doc, dst)[i];
+      if (!k) throw new Error("That bookmark can’t go there.");
+      dstRef = k.ref; dst = k.dict;
+    }
+    const dkids = children(doc, dst);
+    dkids.splice(Math.min(to[to.length - 1], dkids.length), 0, item);
+    relink(doc, dstRef, dst, dkids);
   });
 }
 

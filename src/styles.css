@@ -325,3 +325,9 @@ body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }
 @media (hover: none) { .outline-row .bm-act { opacity: .7; } }
 .chk-lg .split-size { width: 72px; height: 30px; margin: 0 6px; }
 .chk-lg.disabled { opacity: .55; }
+.popup-menu button { display: flex; align-items: center; gap: 16px; }
+.popup-menu button span { flex: 1; }
+.popup-menu button kbd { font: inherit; font-size: 11px; color: var(--muted); }
+.popup-menu button:disabled { opacity: .45; cursor: default; background: transparent; }
+.popup-menu button.danger { color: var(--danger, #c62828); }
+@media (hover: none) and (pointer: coarse) { .popup-menu button kbd { display: none; } }

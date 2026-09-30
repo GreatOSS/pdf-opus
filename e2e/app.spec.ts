@@ -372,11 +372,14 @@ test("bookmarks can be added, renamed and deleted", async ({ page }) => {
   await page.locator("#pageInput").press("Enter");
   await page.locator("#outline a").click();
   await expect(page.locator("#pageInput")).toHaveValue("2");
-  await page.getByRole("button", { name: "Rename “Second page”" }).click();
+  await page.getByRole("button", { name: "Actions for “Second page”" }).click();
+  await page.getByRole("menuitem", { name: /Rename/ }).click();
   await page.locator("dialog input").fill("Renamed");
   await page.locator("dialog").getByRole("button", { name: "Rename" }).click();
   await expect(page.locator("#outline a")).toHaveText(["Renamed"]);
-  await page.getByRole("button", { name: "Delete “Renamed”" }).click();
+  await page.getByRole("button", { name: "Actions for “Renamed”" }).click();
+  await expect(page.getByRole("menuitem", { name: /Move up/ })).toBeDisabled();
+  await page.getByRole("menuitem", { name: /Delete/ }).click();
   await expect(page.locator("#outline")).toContainText("No bookmarks yet");
 });
 
@@ -386,10 +389,35 @@ test("editing a nested outline keeps it intact and expanded", async ({ page }) =
   await page.locator("#tabOutline").click();
   await expect(page.locator("#outline a").first()).toHaveText("Chapter 1");
   await page.locator("#outline .twisty").first().click();
-  await page.getByRole("button", { name: "Delete “Section 1.1”" }).click({ force: true });
+  await page.getByText("Section 1.1").focus();
+  await page.keyboard.press("Delete");
   await expect(page.locator("#outline a")).toHaveText(["Chapter 1", "Section 1.2", "Chapter 2 (closed)", "Section 2.1", "Appendix"]);
   await expect(page.locator("#outline li.open")).toHaveCount(1); // Chapter 1 stays expanded
   await expect(page.getByText("Section 1.2")).toBeVisible();
+});
+
+test("bookmarks can be reordered and nested, by menu and keyboard", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#fileInput").setInputFiles(new URL("./fixtures/outlined.pdf", import.meta.url).pathname);
+  await page.locator("#tabOutline").click();
+  await expect(page.locator("#outline a").first()).toHaveText("Chapter 1");
+  // Appendix goes inside Chapter 2, which opens to show it
+  await page.getByRole("button", { name: "Actions for “Appendix”" }).click({ force: true });
+  await page.getByRole("menuitem", { name: /inside/ }).click();
+  await expect(page.locator("#outline > ul > li > .outline-row a")).toHaveText(["Chapter 1", "Chapter 2 (closed)"]);
+  await expect(page.getByText("Appendix")).toBeVisible();
+  await expect(page.locator('#outline a[data-path="1/1"]')).toBeFocused();
+  // …then back out and above Chapter 2, from the keyboard
+  await page.keyboard.press("Alt+ArrowLeft");
+  await expect(page.locator('#outline a[data-path="2"]')).toBeFocused();
+  await expect(page.locator("#outline > ul > li > .outline-row a")).toHaveText(["Chapter 1", "Chapter 2 (closed)", "Appendix"]);
+  await page.keyboard.press("Alt+ArrowUp");
+  await expect(page.locator("#outline > ul > li > .outline-row a")).toHaveText(["Chapter 1", "Appendix", "Chapter 2 (closed)"]);
+  await page.locator("#btnUndo").click();
+  await expect(page.locator("#outline > ul > li > .outline-row a")).toHaveText(["Chapter 1", "Chapter 2 (closed)", "Appendix"]);
+  await page.locator("#btnUndo").click();
+  await page.locator("#btnUndo").click();
+  await expect(page.locator("#outline > ul > li > .outline-row a")).toHaveText(["Chapter 1", "Chapter 2 (closed)", "Appendix"]);
 });
 
 test("uses the document's printed page numbers", async ({ page }) => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { PDFDocument } from "@cantoo/pdf-lib";
+import { PDFDocument, PDFName, PDFDict, PDFNumber } from "@cantoo/pdf-lib";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
-import { addBookmark, renameBookmark, deleteBookmark, suggestTitle } from "../src/bookmarks";
+import { addBookmark, renameBookmark, deleteBookmark, suggestTitle, moveBookmark, moveTarget, remapPath } from "../src/bookmarks";
 
 async function blank(n = 3) {
   const d = await PDFDocument.create();
@@ -34,5 +34,45 @@ describe("bookmarks", () => {
     expect(suggestTitle([it("body text", 10, 700), it("more body", 10, 688), it("3.", 14, 720), it("Results", 14, 720), it("x", 10, 600)])).toBe("3. Results");
     expect(suggestTitle([it("only", 10, 700), it("body", 10, 690)])).toBeNull();
     expect(suggestTitle([])).toBeNull();
+  });
+});
+
+describe("moving bookmarks", () => {
+  async function tree(bytes: Uint8Array) {
+    const pdf = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+    const t = (items: any[]): any[] => items.map((it) => (it.items.length ? [it.title, t(it.items)] : it.title));
+    return t((await pdf.getOutline()) ?? []);
+  }
+  it("reorders, indents and outdents, keeping children", async () => {
+    let b = await blank();
+    for (const t of ["A", "B", "C"]) b = await addBookmark(b, 0, null, t);
+    b = await moveBookmark(b, [2], moveTarget([2], "up", 3, 0)!);
+    expect(await tree(b)).toEqual(["A", "C", "B"]);
+    b = await moveBookmark(b, [1], moveTarget([1], "in", 3, 0)!);
+    expect(await tree(b)).toEqual([["A", ["C"]], "B"]);
+    b = await moveBookmark(b, [1], moveTarget([1], "in", 2, 1)!);
+    expect(await tree(b)).toEqual([["A", ["C", "B"]]]);
+    b = await moveBookmark(b, [0, 0], moveTarget([0, 0], "down", 2, 0)!);
+    expect(await tree(b)).toEqual([["A", ["B", "C"]]]);
+    b = await moveBookmark(b, [0, 0], moveTarget([0, 0], "out", 2, 0)!);
+    expect(await tree(b)).toEqual([["A", ["C"]], "B"]);
+    b = await moveBookmark(b, [0], moveTarget([0], "down", 2, 0)!);
+    expect(await tree(b)).toEqual(["B", ["A", ["C"]]]);
+    const d = await PDFDocument.load(b);
+    const root = d.catalog.lookup(PDFName.of("Outlines"), PDFDict);
+    expect(root.lookup(PDFName.of("Count"), PDFNumber).asNumber()).toBe(3);
+  });
+  it("refuses impossible moves and remaps paths", () => {
+    expect(moveTarget([0], "up", 2, 0)).toBeNull();
+    expect(moveTarget([1], "down", 2, 0)).toBeNull();
+    expect(moveTarget([0], "in", 2, 0)).toBeNull();
+    expect(moveTarget([1], "out", 2, 0)).toBeNull();
+    // [1] indented under [0] (which had 2 kids): old [1,0] → [0,2,0], [2] → [1]
+    expect(remapPath([1, 0], [1], [0, 2])).toEqual([0, 2, 0]);
+    expect(remapPath([2], [1], [0, 2])).toEqual([1]);
+    expect(remapPath([0, 1], [1], [0, 2])).toEqual([0, 1]);
+    // [0,1] outdented: → [1]; old [1] → [2]
+    expect(remapPath([1], [0, 1], [1])).toEqual([2]);
+    expect(remapPath([0, 2], [0, 1], [1])).toEqual([0, 1]);
   });
 });

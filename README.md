@@ -6,7 +6,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 
 ## Features
 
-- **Read** — smooth continuous scrolling, crisp rendering, fit-to-width/page and pinch/Ctrl+wheel zoom, two-page view, printed page numbers (i, ii, … 1, 2), outline (bookmarks — add your own, rename, delete), links, dark UI.
+- **Read** — smooth continuous scrolling, crisp rendering, fit-to-width/page and pinch/Ctrl+wheel zoom, two-page view, printed page numbers (i, ii, … 1, 2), outline (bookmarks — add your own, rename, delete, reorder and nest them from the ⋮ menu or with Alt+arrows), links, dark UI.
 - **Find** — full-text search with live match count, case-sensitive and whole-word options.
 - **Edit existing text** — click a line to retype it in place; font style, size, colour and alignment are matched, and the old text is removed from the file. Accented Latin, Greek, Cyrillic and common symbols work too (a small subset of DejaVu Sans is embedded when needed).
 - **Redact** — mark areas and remove what's underneath from the file for real (not just a black box): text, image pixels and overlapping annotations. “Find & mark” marks every occurrence of a name or number in one go.

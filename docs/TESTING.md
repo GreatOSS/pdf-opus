@@ -319,3 +319,13 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Split dialog via ⋮ menu: every 4 pages → summary, ZIP download | OK — no horizontal overflow, `labels (split).zip` |
 | Bookmarks by touch: add, rename via row action (always visible, 0.7 opacity) | OK, outline updated |
 | Page errors | None |
+
+## 2026-09-30 — reorder and nest bookmarks
+
+| Workflow | Result |
+|---|---|
+| Nested outline fixture, desktop: ⋮ on “Appendix” → menu (Rename, Move up/down, Put inside the one above, Move out a level, Delete; impossible moves greyed) → Move up via arrow keys + Enter; Alt+→ nests it under Chapter 1 | OK, focus follows the moved bookmark, expanded sections stay expanded; saved file `qpdf --check` and Ghostscript clean, outline structure correct |
+| iPhone 14 (WebKit, touch): ⋮ → Move down | OK; menu fits the screen, key hints hidden on touch |
+| Undo after moves | OK, restores each step |
+| **Found and fixed:** a second Alt+arrow pressed before the outline redrew acted on stale positions and moved the wrong bookmark | Edits are now ignored until the outline has redrawn |
+| Rows now have one ⋮ actions button (was separate rename/delete buttons); F2 renames, Del deletes the focused bookmark | e2e updated; new e2e for menu + keyboard moves in all browsers; unit tests for the moves and path remapping |

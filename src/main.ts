@@ -15,7 +15,8 @@ import { setupEditText, unsupportedChars } from "./edittext";
 import { missingGlyphs, unicodeFontBytes } from "./unifont";
 import * as recent from "./recent";
 import { setupRedact } from "./redactui";
-import { $, el, toast, promptDialog, confirmDialog, showDialog } from "./ui";
+import { $, el, toast, promptDialog, confirmDialog, showDialog, popupMenu } from "./ui";
+import { moveTarget, remapPath, type MoveOp } from "./outlinepath";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 // Absolute URL: the pdf.js worker resolves relative URLs against its own location.
@@ -1467,8 +1468,24 @@ function shiftOpenAfterDelete(path: number[]) {
   moved.forEach((k) => k && outlineOpen.add(k));
   if (doc) loadOutline(doc.pdf);
 }
+/** Move a bookmark and keep the expanded entries (and the moved one's focus) where they went. */
+async function moveOutlineItem(path: number[], op: MoveOp, siblings: number, prevKids: number) {
+  const to = moveTarget(path, op, siblings, prevKids);
+  if (!to || outlineBusy) return;
+  outlineBusy = true;
+  const ok = await mutatePages("Moving bookmark", async (b) => (await import("./bookmarks")).moveBookmark(b, path, to, crypt()), undefined, true)
+    .finally(() => (outlineBusy = false));
+  if (!ok) return;
+  const keys = [...outlineOpen].map((k) => remapPath(k.split("/").map(Number), path, to).join("/"));
+  outlineOpen.clear();
+  keys.forEach((k) => outlineOpen.add(k));
+  for (let d = 1; d < to.length; d++) outlineOpen.add(to.slice(0, d).join("/")); // show where it went
+  if (doc) loadOutline(doc.pdf, to.join("/"));
+}
+/** An edit is running: the rows on screen still carry the old paths, so further edits wait for the new outline. */
+let outlineBusy = false;
 let outlineSeq = 0;
-async function loadOutline(pdf: PDFDocumentProxy) {
+async function loadOutline(pdf: PDFDocumentProxy, focusPath?: string) {
   const root = $("#outline");
   const seq = ++outlineSeq;
   const outline = await pdf.getOutline().catch(() => null);
@@ -1496,6 +1513,7 @@ async function loadOutline(pdf: PDFDocumentProxy) {
         row.append(tw);
       } else row.append(el("span", { className: "twisty-space" }));
       const a = el("a", { href: "#", textContent: it.title || "(untitled)" }) as HTMLAnchorElement;
+      a.dataset.path = path.join("/");
       if (it.bold) a.style.fontWeight = "600";
       if (it.italic) a.style.fontStyle = "italic";
       a.onclick = (e) => {
@@ -1504,19 +1522,37 @@ async function loadOutline(pdf: PDFDocumentProxy) {
         else if (it.url) window.open(it.url, "_blank", "noopener");
       };
       const title = it.title || "(untitled)";
-      const ren = el("button", { className: "icon-btn bm-act", type: "button", title: "Rename", ariaLabel: `Rename “${title}”`, innerHTML: icons.editText }) as HTMLButtonElement;
-      ren.onclick = async () => {
+      const siblings = items.length, prevKids = items[i - 1]?.items?.length ?? 0;
+      const rename = async () => {
         const t = await promptDialog({ title: "Rename bookmark", message: "", value: it.title ?? "", okLabel: "Rename", validate: (v) => (v.trim() ? null : "Enter a name.") });
         if (t === null || t.trim() === it.title) return;
         mutatePages("Renaming bookmark", async (b) => (await import("./bookmarks")).renameBookmark(b, path, t.trim(), crypt()), undefined, true);
       };
-      const del = el("button", { className: "icon-btn bm-act", type: "button", title: "Delete", ariaLabel: `Delete “${title}”`, innerHTML: icons.trash }) as HTMLButtonElement;
-      del.onclick = async () => {
+      const remove = async () => {
         if (it.items?.length && !(await confirmDialog({ title: "Delete bookmark?", message: `“${title}” and the ${it.items.length === 1 ? "bookmark" : `${it.items.length} bookmarks`} inside it will be deleted.`, okLabel: "Delete", danger: true }))) return;
         const ok = await mutatePages("Deleting bookmark", async (b) => (await import("./bookmarks")).deleteBookmark(b, path, crypt()), undefined, true);
         if (ok) shiftOpenAfterDelete(path);
       };
-      row.append(a, ren, del);
+      const move = (op: MoveOp) => moveOutlineItem(path, op, siblings, prevKids);
+      const can = (op: MoveOp) => !!moveTarget(path, op, siblings, prevKids);
+      a.addEventListener("keydown", (e) => {
+        const op = e.altKey && !e.ctrlKey && !e.metaKey ? ({ ArrowUp: "up", ArrowDown: "down", ArrowRight: "in", ArrowLeft: "out" } as Record<string, MoveOp>)[e.key] : undefined;
+        if (op) { if (can(op) && !outlineBusy) move(op); }
+        else if (e.key === "F2") rename();
+        else if (e.key === "Delete") remove();
+        else return;
+        e.preventDefault(); e.stopPropagation();
+      });
+      const act = el("button", { className: "icon-btn bm-act", type: "button", title: "Bookmark actions", ariaLabel: `Actions for “${title}”`, ariaHasPopup: "menu", innerHTML: icons.more }) as HTMLButtonElement;
+      act.onclick = () => popupMenu(act, [
+        { label: "Rename…", hint: "F2", run: rename },
+        { label: "Move up", hint: "Alt+↑", run: () => move("up"), disabled: !can("up") },
+        { label: "Move down", hint: "Alt+↓", run: () => move("down"), disabled: !can("down") },
+        { label: "Put inside the one above", hint: "Alt+→", run: () => move("in"), disabled: !can("in") },
+        { label: "Move out a level", hint: "Alt+←", run: () => move("out"), disabled: !can("out") },
+        { label: "Delete", hint: "Del", run: remove, danger: true },
+      ]);
+      row.append(a, act);
       li.append(row);
       if (it.items?.length) li.append(build(it.items, path));
       ul.append(li);
@@ -1526,6 +1562,7 @@ async function loadOutline(pdf: PDFDocumentProxy) {
   const tree = build(outline);
   tree.setAttribute("role", "tree");
   root.append(tree);
+  if (focusPath) root.querySelector<HTMLElement>(`a[data-path="${focusPath}"]`)?.focus();
   // Resolve each entry's page so the current section can be highlighted while reading.
   outlinePages = [];
   const links = [...root.querySelectorAll<HTMLAnchorElement>("a")];
@@ -1789,7 +1826,7 @@ function showShortcuts() {
     [`${mod}O`, "Open"], [`${mod}S`, "Save"], [`${isMac ? "⇧⌘S" : "Ctrl+Shift+S"}`, "Save as"], [`${mod}P`, "Print"],
     [`${mod}F`, "Find"], ["Enter / ⇧Enter", "Next / previous match"], [`${mod}+ / ${mod}−`, "Zoom in / out"], [`${mod}0`, "Fit width"],
     [`${mod}Z / ${isMac ? "⇧⌘Z" : "Ctrl+Y"}`, "Undo / redo"], ["E, H, T, N, D, I, S, R", "Edit text, highlight, text, note, draw, image, sign, redact"], ["Esc", "Back to select tool"], ["Enter (Note tool)", "Add a note, or open the focused note"], [`${mod}Enter`, "Save a note or reply"],
-    ["← → / PgUp PgDn", "Previous / next page"], ["Home / End", "First / last page"], ["F4", "Toggle sidebar"], ["Del", "Delete selected pages (sidebar)"], ["Alt+↑ / Alt+↓", "Move selected pages (sidebar)"],
+    ["← → / PgUp PgDn", "Previous / next page"], ["Home / End", "First / last page"], ["F4", "Toggle sidebar"], ["Del", "Delete selected pages (sidebar)"], ["Alt+↑ / Alt+↓", "Move selected pages (sidebar)"], ["Alt+↑ ↓ ← →", "Move or nest the focused bookmark"], ["F2", "Rename the focused bookmark"],
   ];
   const dl = el("dl", { className: "props keys" });
   for (const [k, v] of list) dl.append(el("dt", {}, [el("kbd", { textContent: k })]), el("dd", { textContent: v }));
