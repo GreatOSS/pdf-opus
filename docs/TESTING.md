@@ -329,3 +329,13 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 | Undo after moves | OK, restores each step |
 | **Found and fixed:** a second Alt+arrow pressed before the outline redrew acted on stale positions and moved the wrong bookmark | Edits are now ignored until the outline has redrawn |
 | Rows now have one ⋮ actions button (was separate rename/delete buttons); F2 renames, Del deletes the focused bookmark | e2e updated; new e2e for menu + keyboard moves in all browsers; unit tests for the moves and path remapping |
+
+## 2026-09-30 — phones: notes, replies, Notes tab, flatten
+
+| Workflow | Result |
+|---|---|
+| iPhone 14 (WebKit) + Pixel 7 (Chromium), f1040 filled: Note tool → tap page → add note; tap the note → reply | OK, dialogs fit, no errors |
+| Notes tab lists note + reply; tap entry → jump | **Fixed:** the sidebar stayed open over most of the page and hid the note's popup. Jumping from Notes or Outline now closes it on small screens (thumbnails already did) |
+| Tool hints on touch said “Click … (or press Enter)” | **Fixed:** say “Tap” on touch screens |
+| Flatten on phone: 199 fields flattened, note kept | OK |
+| **Found and fixed (all sizes):** a closed sidebar was only 0 px wide, so Tab and screen readers still reached its thumbnails/outline links | Closed sidebar is now `visibility: hidden` (after the collapse animation). Keyboard check: 0 Tab stops in it when closed, 14 when open. New e2e for small-screen jump + hidden state |

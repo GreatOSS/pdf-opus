@@ -420,6 +420,18 @@ test("bookmarks can be reordered and nested, by menu and keyboard", async ({ pag
   await expect(page.locator("#outline > ul > li > .outline-row a")).toHaveText(["Chapter 1", "Chapter 2 (closed)", "Appendix"]);
 });
 
+test("on small screens, jumping to a bookmark closes the sidebar that covers the page", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/");
+  await page.locator("#fileInput").setInputFiles(new URL("./fixtures/outlined.pdf", import.meta.url).pathname);
+  await page.locator("#btnSidebar").click();
+  await page.locator("#tabOutline").click();
+  await page.getByText("Appendix").click();
+  await expect(page.locator("body")).not.toHaveClass(/sidebar-open/);
+  await expect(page.locator("#pageInput")).toHaveValue("6");
+  await expect(page.getByText("Appendix")).toBeHidden(); // and out of the Tab order
+});
+
 test("uses the document's printed page numbers", async ({ page }) => {
   const d = await PDFDocument.create();
   for (let i = 0; i < 7; i++) d.addPage([300, 400]);

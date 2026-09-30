@@ -997,7 +997,8 @@ function renderToolOptions(toolId: string) {
     r.oninput = () => { prefs.opacity = +r.value; savePrefs(); applyParams(toolId); };
     box.append(el("label", { className: "range" }, [el("span", { className: "range-label", textContent: "Opacity" }), r]));
   }
-  box.append(el("span", { className: "tool-hint", textContent: spec.hint }));
+  const hint = matchMedia("(pointer: coarse)").matches ? spec.hint.replace(/\bClick/g, "Tap").replace(/\bclick/g, "tap").replace(/ \(or press Enter\)/, "") : spec.hint;
+  box.append(el("span", { className: "tool-hint", textContent: hint }));
   if (toolId === "toolSign") {
     const b = el("button", { className: "text-btn", type: "button", textContent: "Change signature…" }) as HTMLButtonElement;
     b.onclick = () => startSignature();
@@ -1518,6 +1519,7 @@ async function loadOutline(pdf: PDFDocumentProxy, focusPath?: string) {
       if (it.italic) a.style.fontStyle = "italic";
       a.onclick = (e) => {
         e.preventDefault();
+        if (narrow.matches) toggleSidebar(false);
         if (it.dest) linkService.goToDestination(it.dest);
         else if (it.url) window.open(it.url, "_blank", "noopener");
       };
@@ -1667,6 +1669,7 @@ async function loadNotes() {
   }
 }
 function goToNote(page: number, id: string, rect: number[]) {
+  if (narrow.matches) toggleSidebar(false); // the sidebar covers the page on small screens
   viewer.scrollPageIntoView({ pageNumber: page, destArray: [null, { name: "XYZ" }, Math.max(0, rect[0] - 40), rect[3] + 60, null] });
   // The annotation layer may still be rendering; wait for the element, then point it out.
   let tries = 0;
