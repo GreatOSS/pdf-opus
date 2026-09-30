@@ -254,6 +254,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Welcome hint on touch devices
 - Phones were told to “drop PDFs … anywhere · Ctrl+O”. Touch-only devices (pointer: coarse, no hover) now see “Pick several files at once to combine them” instead. Verified: 390×844 touch → touch hint only; 1280×800 desktop → drop/shortcut hint only. Roadmap: comments/sticky notes noted as item 9 (pdf.js 6 comment support needs its comment manager UI).
 
+### 2026-09-30 — Sticky notes
+- New “Add note” tool (N): click a page → note text (Ctrl+Enter or Add note) → standard /Text annotation (Unicode contents, kept inside the page, printable, no-zoom icon); click a note in the tool to change or delete it; undoable. Outside the tool pdf.js shows the note popup on click. tracemonkey: added “Line one / Line two — Zoë”, edited to “Edited note”, added + deleted a second, undo/redo → saved file has one /Text annot with “Edited note”; Poppler renders the icon. Found while testing: Esc didn't leave the Note tool (nor Edit text/Redact — Esc only checked pdf.js editor modes) → fixed; note box was a one-line input height → 8 lines. Phone 390 px: 9 tool buttons fit the bottom bar. New e2e (3 engines), 48/48; unit 59/59.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

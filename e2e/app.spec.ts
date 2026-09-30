@@ -232,3 +232,20 @@ test("dark pages recolours the display only and is remembered", async ({ page })
   await expect(page.locator("body")).toHaveClass(/dark-pages/);
   await expect(page.locator("#miDarkPages")).toHaveText("Normal pages");
 });
+
+test("sticky notes can be added, edited and deleted", async ({ page }) => {
+  await open(page, 1);
+  await page.locator("#toolNote").click();
+  const box = (await page.locator('.page[data-page-number="1"]').boundingBox())!;
+  await page.mouse.click(box.x + 300, box.y + 200);
+  const note = page.getByRole("textbox", { name: "Note" });
+  await note.fill("Please check — Zoë");
+  await note.press("Control+Enter");
+  await expect(page.locator(".textAnnotation")).toHaveCount(1);
+  await page.locator(".textAnnotation").click();
+  await expect(note).toHaveValue("Please check — Zoë");
+  await page.getByRole("button", { name: "Delete note" }).click();
+  await expect(page.locator(".textAnnotation")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#toolNote")).toHaveAttribute("aria-pressed", "false");
+});

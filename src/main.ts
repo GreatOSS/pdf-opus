@@ -59,6 +59,7 @@ $("#app").innerHTML = `
       ${btn("toolEdit", icons.editText, "Edit text", "E")}
       ${btn("toolHighlight", icons.highlight, "Highlight", "H")}
       ${btn("toolText", icons.text, "Add text", "T")}
+      ${btn("toolNote", icons.note, "Add note", "N")}
       ${btn("toolDraw", icons.draw, "Draw", "D")}
       ${btn("toolImage", icons.image, "Add image", "I")}
       ${btn("toolSign", icons.signature, "Add signature", "S")}
@@ -774,7 +775,7 @@ eventBus.on("editingstateschanged", ({ details }: any) => {
 
 // ───────────────────────────── Annotation tools ─────────────────────────────
 const toolButtons: Record<string, number> = {
-  toolNone: Mode.NONE, toolEdit: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.STAMP, toolRedact: Mode.NONE,
+  toolNone: Mode.NONE, toolEdit: Mode.NONE, toolHighlight: Mode.HIGHLIGHT, toolText: Mode.FREETEXT, toolNote: Mode.NONE, toolDraw: Mode.INK, toolImage: Mode.STAMP, toolSign: Mode.STAMP, toolRedact: Mode.NONE,
 };
 const palette = ["#000000", "#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#FFFFFF"];
 const hlPalette = ["#FFF176", "#A5F2B8", "#9CDCFE", "#FFB3D9", "#FFC680"];
@@ -833,6 +834,7 @@ function renderToolOptions(toolId: string) {
     toolText: { colors: palette, size: ["Size", 6, 72, 14], hint: "Click anywhere on a page to add text." },
     toolDraw: { colors: palette, size: ["Thickness", 1, 20, 3], opacity: true, hint: "Drag on a page to draw." },
     toolSign: { colors: [], hint: "Click on a page to place your signature. Drag to move it, drag a corner to resize." },
+    toolNote: { colors: [], hint: "Click on a page to add a sticky note. Click a note to change or delete it." },
     toolEdit: { colors: [], hint: "Click any line of text to change it. Enter to apply, Esc to cancel." },
     toolRedact: { colors: [], hint: "Drag over anything you want to remove permanently — text underneath is deleted, not just covered." },
     toolImage: { colors: [], hint: "Choose an image, then drag it where you want. Click on a page to add another." },
@@ -993,6 +995,47 @@ container.addEventListener("focusout", (e) => {
     if (bad.length) toast(`Other PDF apps may not show ${bad.slice(0, 5).join(" ")} in this text box. If others need to see it, use other characters.`, "error");
   }, () => {});
 });
+
+// ───────────────────────────── Sticky notes ─────────────────────────────
+async function noteDialog(title: string, text: string, canDelete: boolean): Promise<string | null | undefined> {
+  const area = el("textarea", { className: "text-input note-text", rows: 6, value: text, ariaLabel: "Note" }) as HTMLTextAreaElement;
+  // Ctrl/⌘+Enter saves; plain Enter makes a new line.
+  area.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); area.form?.requestSubmit(); } });
+  setTimeout(() => area.focus(), 0);
+  const r = await showDialog<string>({
+    title, body: area,
+    buttons: [...(canDelete ? [{ label: "Delete note", value: "delete" }] : []), { label: "Cancel", value: "cancel" }, { label: canDelete ? "Save" : "Add note", value: "ok", primary: true }],
+  });
+  if (r === "delete") return null;
+  if (r !== "ok") return undefined;
+  return area.value.trim() || (canDelete ? null : undefined);
+}
+container.addEventListener("pointerdown", async (e) => {
+  if (activeToolId !== "toolNote" || e.button !== 0 || !doc) return;
+  const pageEl = (e.target as HTMLElement).closest?.(".page") as HTMLElement | null;
+  if (!pageEl) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const idx = +pageEl.dataset.pageNumber! - 1;
+  const view = viewer.getPageView(idx);
+  if (!view?.viewport) return;
+  const notes = await import("./notes");
+  const existing = (e.target as HTMLElement).closest(".textAnnotation") as HTMLElement | null;
+  const id = existing?.dataset.annotationId;
+  if (id) {
+    const annots = await (await doc.pdf.getPage(idx + 1)).getAnnotations();
+    const a = annots.find((x: any) => x.id === id);
+    const text = await noteDialog("Note", a?.contentsObj?.str ?? "", true);
+    if (text === undefined || text === (a?.contentsObj?.str ?? "")) return;
+    mutatePages(text === null ? "Deleting note" : "Updating note", (b) => notes.updateNote(b, idx, id, text, crypt()), idx + 1, true);
+    return;
+  }
+  const r = pageEl.getBoundingClientRect();
+  const pt = view.viewport.convertToPdfPoint(e.clientX - r.left - pageEl.clientLeft, e.clientY - r.top - pageEl.clientTop) as [number, number];
+  const text = await noteDialog("Add note", "", false);
+  if (!text) return;
+  mutatePages("Adding note", (b) => notes.addNote(b, idx, pt, text, crypt()), idx + 1, true);
+}, true);
 
 // ───────────────────────────── Redaction ─────────────────────────────
 const redact = setupRedact({
@@ -1412,7 +1455,7 @@ function showShortcuts() {
   const list: [string, string][] = [
     [`${mod}O`, "Open"], [`${mod}S`, "Save"], [`${isMac ? "⇧⌘S" : "Ctrl+Shift+S"}`, "Save as"], [`${mod}P`, "Print"],
     [`${mod}F`, "Find"], ["Enter / ⇧Enter", "Next / previous match"], [`${mod}+ / ${mod}−`, "Zoom in / out"], [`${mod}0`, "Fit width"],
-    [`${mod}Z / ${isMac ? "⇧⌘Z" : "Ctrl+Y"}`, "Undo / redo"], ["E, H, T, D, I, S, R", "Edit text, highlight, text, draw, image, sign, redact"], ["Esc", "Back to select tool"],
+    [`${mod}Z / ${isMac ? "⇧⌘Z" : "Ctrl+Y"}`, "Undo / redo"], ["E, H, T, N, D, I, S, R", "Edit text, highlight, text, note, draw, image, sign, redact"], ["Esc", "Back to select tool"],
     ["← → / PgUp PgDn", "Previous / next page"], ["Home / End", "First / last page"], ["F4", "Toggle sidebar"], ["Del", "Delete selected pages (sidebar)"], ["Alt+↑ / Alt+↓", "Move selected pages (sidebar)"],
   ];
   const dl = el("dl", { className: "props keys" });
@@ -1629,11 +1672,11 @@ window.addEventListener("keydown", (e) => {
   if (cmd || e.altKey) return;
   if (e.key === "Escape") {
     if (!$("#findBar").hidden) closeFind();
-    else if (currentMode !== Mode.NONE) setMode(Mode.NONE, true);
+    else if (currentMode !== Mode.NONE || activeToolId !== "toolNone") setMode(Mode.NONE, true);
     return;
   }
   const inThumbs = $("#thumbs").contains(t);
-  const toolKeys: Record<string, string> = { r: "toolRedact", e: "toolEdit", h: "toolHighlight", t: "toolText", d: "toolDraw", i: "toolImage", s: "toolSign" };
+  const toolKeys: Record<string, string> = { r: "toolRedact", e: "toolEdit", h: "toolHighlight", t: "toolText", n: "toolNote", d: "toolDraw", i: "toolImage", s: "toolSign" };
   if (toolKeys[k] && !e.shiftKey) { e.preventDefault(); $("#" + toolKeys[k]).click(); return; }
   if (inThumbs) return;
   if (viewer.isInPresentationMode || currentMode !== Mode.NONE) return;
