@@ -179,6 +179,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — OCR languages
 - OCR dialog has a “Document language” select: English, German, French, Spanish, Italian, Portuguese, Dutch (tesseract best_int data, 0.7–3 MB each, served from /ocr/lang). Default guessed from the browser locale, last choice remembered. fr-FR context → French preselected; generated French invoice scan → 34 words, all accents right (“Élève”, “François Lefèvre”, “Besançon”, “dû”, “€”, “bientôt”) in the rebuilt text layer. unit 41/41, e2e 28/28 (5 engines).
 
+### 2026-09-30 — Redact: inline images
+- Inline images (BI…EI in the content stream) under a mark were left in the file. Now any inline image a mark touches is removed whole (they're small by spec; counted in the "removed completely" toast); Edit text doesn't touch them. Hands-on: generated PDF with two inline 16×16 images + text → marked part of the big one in the app → toast “1 image … removed completely” → saved: pdfimages lists only the other inline image, pdftotext text intact, Poppler render shows black box + untouched second image. unit 42/42.
+
 ### Known gaps / next
-- Redaction: inline images (BI…EI) aren't handled yet; JBIG2/CCITT images under a mark are removed whole. Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
+- Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).

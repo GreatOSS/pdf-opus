@@ -194,11 +194,11 @@ const hexOf = (bytes: number[]) => "<" + bytes.map((x) => x.toString(16).padStar
  */
 export function removeTextInRects(
   content: Uint8Array, rects: Rect[], fontFor: (name: string) => FontInfo,
-  initialCtm: M = [1, 0, 0, 1, 0, 0], onForm?: (name: string, ctm: M) => void,
-): { bytes: Uint8Array; removed: number } {
+  initialCtm: M = [1, 0, 0, 1, 0, 0], onForm?: (name: string, ctm: M) => void, dropInlineImages = false,
+): { bytes: Uint8Array; removed: number; inline: number } {
   const toks = tokenize(content);
   const edits: { s: number; e: number; text: string }[] = [];
-  let removed = 0;
+  let removed = 0, inline = 0, biStart = -1;
   interface GS { ctm: M; tc: number; tw: number; th: number; tl: number; rise: number; size: number; font: FontInfo; }
   let gs: GS = { ctm: initialCtm, tc: 0, tw: 0, th: 1, tl: 0, rise: 0, size: 0, font: { bytes: 1, width: () => 500 } };
   const stack: GS[] = [];
@@ -248,7 +248,14 @@ export function removeTextInRects(
   };
 
   for (const tok of toks) {
+    if (tok.t === "other" && tok.v === "inline-image") {
+      // Inline images are small by design; drop any that a mark touches rather than editing pixels.
+      if (dropInlineImages && biStart >= 0 && imagePixelRects(gs.ctm, 1, 1, rects).length) { edits.push({ s: biStart, e: tok.e, text: "" }); inline++; }
+      biStart = -1;
+      continue;
+    }
     if (tok.t !== "op") { operands.push(tok); continue; }
+    if (tok.v === "BI") { biStart = tok.s; operands = []; continue; }
     const nums = operands.filter((o) => o.t === "num").map((o) => o.v as number);
     const start = operands.length ? operands[0].s : tok.s;
     switch (tok.v) {
@@ -291,7 +298,7 @@ export function removeTextInRects(
     }
     operands = [];
   }
-  if (!edits.length) return { bytes: content, removed: 0 };
+  if (!edits.length) return { bytes: content, removed: 0, inline: 0 };
   const enc = new TextEncoder();
   const chunks: Uint8Array[] = [];
   let pos = 0;
@@ -304,7 +311,7 @@ export function removeTextInRects(
   const out = new Uint8Array(total);
   let o = 0;
   for (const c of chunks) { out.set(c, o); o += c.length; }
-  return { bytes: out, removed };
+  return { bytes: out, removed, inline };
 }
 
 /** Apply text removal to a page (all its content streams are merged into one). */
@@ -329,7 +336,7 @@ function fontLookup(doc: PDFDocument, resources: PDFDict | undefined) {
  * copied (never edited in place) and the owner's resources are cloned, so other
  * pages that share the same form keep their text.
  */
-function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, resources: PDFDict | undefined, calls: { name: string; ctm: M }[], rects: Rect[], depth: number, images: ImageJob[] = []): number {
+function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, resources: PDFDict | undefined, calls: { name: string; ctm: M }[], rects: Rect[], depth: number, images: ImageJob[] = [], stats?: { inline: number }): number {
   if (!resources || !calls.length || depth > 8) return 0;
   const ctx = doc.context;
   let res = resources;
@@ -364,11 +371,12 @@ function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, reso
     const formCtm = mul(m, call.ctm);
     const formRes = sdict.lookupMaybe(PDFName.of("Resources"), PDFDict) ?? res;
     const nested: { name: string; ctm: M }[] = [];
-    const { bytes: out, removed } = removeTextInRects(bytes, rects, fontLookup(doc, formRes), formCtm, (name, ctm) => nested.push({ name, ctm }));
+    const { bytes: out, removed, inline } = removeTextInRects(bytes, rects, fontLookup(doc, formRes), formCtm, (name, ctm) => nested.push({ name, ctm }), !!stats);
+    if (stats) stats.inline += inline;
     const dict = sdict.clone(ctx);
     const imagesBefore = images.length;
-    const nestedRemoved = processForms(doc, (r) => dict.set(PDFName.of("Resources"), r), formRes, nested, rects, depth + 1, images);
-    if (!removed && !nestedRemoved && images.length === imagesBefore) continue;
+    const nestedRemoved = processForms(doc, (r) => dict.set(PDFName.of("Resources"), r), formRes, nested, rects, depth + 1, images, stats);
+    if (!removed && !inline && !nestedRemoved && images.length === imagesBefore) continue;
     const copy = ctx.flateStream(out);
     for (const [k, v] of dict.entries()) {
       if (!["Filter", "DecodeParms", "Length"].includes(k.decodeText())) copy.dict.set(k, v);
@@ -380,7 +388,8 @@ function processForms(doc: PDFDocument, setResources: (r: PDFDict) => void, reso
 }
 
 /** Apply text removal to a page, including text drawn via Form XObjects. */
-export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[], images?: ImageJob[]): number {
+/** Pass `stats` (redaction) to also drop inline images the rects touch; their count is added to it. */
+export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[], images?: ImageJob[], stats?: { inline: number }): number {
   const ctx = doc.context;
   const node = page.node;
   const contents = node.get(PDFName.of("Contents"));
@@ -392,9 +401,10 @@ export function removeTextFromPage(doc: PDFDocument, page: PDFPage, rects: Rect[
   for (const p of parts) { joined.set(p, o); o += p.length; joined[o++] = 10; }
   const resources = node.Resources();
   const forms: { name: string; ctm: M }[] = [];
-  const { bytes, removed } = removeTextInRects(joined, rects, fontLookup(doc, resources), [1, 0, 0, 1, 0, 0], (name, ctm) => forms.push({ name, ctm }));
-  if (removed) node.set(PDFName.of("Contents"), ctx.register(ctx.flateStream(bytes)));
-  return removed + processForms(doc, (r) => node.set(PDFName.of("Resources"), r), resources, forms, rects, 0, images);
+  const { bytes, removed, inline } = removeTextInRects(joined, rects, fontLookup(doc, resources), [1, 0, 0, 1, 0, 0], (name, ctm) => forms.push({ name, ctm }), !!stats);
+  if (stats) stats.inline += inline;
+  if (removed || inline) node.set(PDFName.of("Contents"), ctx.register(ctx.flateStream(bytes)));
+  return removed + processForms(doc, (r) => node.set(PDFName.of("Resources"), r), resources, forms, rects, 0, images, stats);
 }
 
 export interface RedactionMark { pageIndex: number; rect: Rect }
@@ -419,7 +429,9 @@ export async function applyRedactions(bytes: Uint8Array, marks: RedactionMark[],
   for (const [idx, rects] of byPage) {
     const page = doc.getPage(idx);
     const images: ImageJob[] = [];
-    glyphs += removeTextFromPage(doc, page, rects, images);
+    const stats = { inline: 0 };
+    glyphs += removeTextFromPage(doc, page, rects, images, stats);
+    imagesRemoved += stats.inline;
     // The same image can be drawn more than once; erase all covered areas in one copy.
     const merged = new Map<PDFDict, Map<string, ImageJob>>();
     for (const j of images) {

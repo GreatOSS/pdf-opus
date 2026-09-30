@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream } from "@cantoo/pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream } from "@cantoo/pdf-lib";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { applyRedactions, removeTextFromPage, tokenize } from "../src/redact";
 
@@ -165,5 +165,25 @@ describe("images under redaction marks", () => {
   it("ignores images outside the marks", async () => {
     const r = await applyRedactions(await withImage({ predictor: false }), [{ pageIndex: 0, rect: [0, 0, 50, 50] }]);
     expect(r.images + r.imagesRemoved).toBe(0);
+  });
+  it("drops inline images under a mark and keeps the others (edit text keeps them all)", async () => {
+    const d = await PDFDocument.create();
+    const page = d.addPage([600, 800]);
+    const img = (x: number, y: number) => `q 40 0 0 40 ${x} ${y} cm BI /W 2 /H 2 /CS /G /BPC 8 ID \u0000EI\u0001\u0002\u0003 EI Q\n`;
+    page.node.set(PDFName.of("Contents"), d.context.register(d.context.flateStream(img(100, 100) + img(300, 300))));
+    const bytes = await d.save();
+    const count = async (b: Uint8Array) => {
+      const doc = await PDFDocument.load(b);
+      const c = doc.context.lookup(doc.getPage(0).node.get(PDFName.of("Contents")));
+      const streams = (c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c]) as PDFRawStream[];
+      return streams.flatMap((st) => tokenize(decodePDFRawStream(st).decode())).filter((t) => t.v === "inline-image").length;
+    };
+    expect(await count(bytes)).toBe(2);
+    const r = await applyRedactions(bytes, [{ pageIndex: 0, rect: [120, 120, 10, 10] }]);
+    expect(r.imagesRemoved).toBe(1);
+    expect(await count(r.bytes)).toBe(1);
+    const doc = await PDFDocument.load(bytes);
+    removeTextFromPage(doc, doc.getPage(0), [[120, 120, 10, 10]]);
+    expect(await count(await doc.save())).toBe(2);
   });
 });
