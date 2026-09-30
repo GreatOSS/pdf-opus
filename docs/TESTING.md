@@ -191,6 +191,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Tablet form fill: non-Latin-1 names
 - 820×1180 touch, f1040: tapped fields and typed; 2-char year field truncated correctly; checkbox saved. Found: a value with “Ł” (outside WinAnsi) was saved with no appearance stream — pdf.js drops it and sets NeedAppearances; Poppler then rebuilt it and printed “Zoë Müller-ukasz”, and viewers that don't rebuild would show the field empty. Now such text fields get an appearance in the embedded DejaVu subset (DA size/colour, auto size, Q alignment, multiline wrap, /Tx BMC), and NeedAppearances is cleared when every filled field has one. Verified: “Zoë Łukasz”, “Główna 12” render in Poppler (no font warning), ASCII fields keep pdf.js's appearance, reopened in Leaflark with values intact. Limit: fallback font is regular weight, so it doesn't match bold field fonts. unit 45/45.
 
+### 2026-09-30 — Dark mode pass (newer dialogs)
+- 1280×800, prefers-color-scheme dark, tracemonkey: “Reduce file size” dialog and Redact → “Find & mark” prompt + tool options bar — legible contrast, focus ring visible, buttons consistent, no console errors. No changes needed.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
