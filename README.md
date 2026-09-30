@@ -18,7 +18,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 - **Flatten** — make form entries, highlights, drawings and signatures a permanent part of the page before you send it (notes and links are kept; undoable).
 - **Combine & convert** — open or drop several PDFs and JPEG/PNG images at once to combine them into one PDF.
 - **Page numbers, headers/footers & watermarks** — stamped into the page content (correct on rotated pages): several number formats, custom header/footer text and Bates numbers (e.g. `ACME-{n:6}`), cover-page option.
-- **Organize pages** — drag thumbnails to reorder, rotate, delete, insert blank pages, insert or append other PDFs, extract a page range to a new PDF, crop pages (auto-trim white margins or custom margins), and save pages as PNG/JPEG images (a ZIP for several). Forms and annotations survive page edits.
+- **Organize pages** — drag thumbnails to reorder, rotate, delete, insert blank pages, insert or append other PDFs, extract a page range to a new PDF, split into several files (every N pages, at each bookmark, or custom ranges), crop pages (auto-trim white margins or custom margins), and save pages as PNG/JPEG images (a ZIP for several). Forms and annotations survive page edits.
 - **Undo/redo** for both annotations and page edits.
 - **Dark pages** — night reading: pages shown light-on-dark (display only).
 - **Present** — full-screen, one page at a time; arrow keys, Space or click to move, Esc to exit.

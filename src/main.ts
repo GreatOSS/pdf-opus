@@ -136,6 +136,7 @@ $("#app").innerHTML = `
   <hr />
   <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
+  <button role="menuitem" id="miSplit">Split into several files…</button>
   <button role="menuitem" id="miCrop">Crop pages…</button>
   <button role="menuitem" id="miStamp">Page numbers, headers & watermark…</button>
   <hr />
@@ -566,6 +567,82 @@ async function extractDialog() {
     toast(`Extracted ${idx.length} page${idx.length === 1 ? "" : "s"}`);
   } catch (e: any) { toast(e.message, "error"); }
 }
+/** Top-level bookmarks with the (zero-based) page each one points to. */
+async function topLevelSections(pdf: PDFDocumentProxy): Promise<{ page: number; title: string }[]> {
+  const outline = (await pdf.getOutline().catch(() => null)) ?? [];
+  const out: { page: number; title: string }[] = [];
+  for (const it of outline) {
+    try {
+      const dest = typeof it.dest === "string" ? await pdf.getDestination(it.dest) : it.dest;
+      if (dest?.[0] != null) out.push({ page: typeof dest[0] === "number" ? dest[0] : await pdf.getPageIndex(dest[0]), title: it.title ?? "" });
+    } catch { /* unresolvable destination: skip */ }
+  }
+  return out;
+}
+
+/** Split the document into several PDFs: every N pages, at each top-level bookmark, or custom ranges. */
+async function splitDialog() {
+  if (!doc) return;
+  const pdf = doc.pdf, n = pdf.numPages, base = doc.name.replace(/\.pdf$/i, "");
+  if (n < 2) { toast("This document has only one page."); return; }
+  const R = await import("./ranges");
+  const sections = R.splitAtStarts(n, await topLevelSections(pdf));
+  const saved = JSON.parse(localStorage.getItem("leaflark.split") || "{}");
+  const radio = (value: string, label: string, disabled = false) => {
+    const i = el("input", { type: "radio", name: "splitMode", value, disabled }) as HTMLInputElement;
+    return { i, row: el("label", { className: "chk-lg" + (disabled ? " disabled" : "") }, [i, label]) };
+  };
+  const every = radio("every", "Every");
+  const size = el("input", { type: "number", min: "1", max: String(n), value: String(Math.min(saved.size ?? 1, n)), className: "text-input split-size", ariaLabel: "Pages per file" }) as HTMLInputElement;
+  every.row.append(size, el("span", { textContent: "pages" }));
+  const marks = radio("marks", sections.length > 1 ? `At each bookmark (${sections.length} files)` : "At each bookmark (this document has none)", sections.length < 2);
+  const custom = radio("custom", "Custom ranges, one file each");
+  const ranges = el("input", { type: "text", className: "text-input", placeholder: "e.g. 1-3, 4-7, 8-", ariaLabel: "Custom ranges", value: saved.ranges ?? "" }) as HTMLInputElement;
+  const summary = el("p", { className: "hint-text", ariaLive: "polite" });
+  const mode = () => (marks.i.checked ? "marks" : custom.i.checked ? "custom" : "every");
+  const plan = () => {
+    const m = mode();
+    return m === "marks" ? sections : m === "custom" ? R.splitCustom(ranges.value, n) : R.splitEvery(n, Math.max(1, Math.floor(+size.value || 1)));
+  };
+  const update = () => {
+    ranges.hidden = !custom.i.checked;
+    try { const p = plan(); summary.textContent = `${p.length} file${p.length === 1 ? "" : "s"}${p.length > 1 ? ", saved together in a ZIP file" : ""}.`; }
+    catch (e: any) { summary.textContent = e.message; }
+  };
+  ({ every, marks, custom } as Record<string, typeof every>)[saved.mode === "marks" && sections.length > 1 ? "marks" : saved.mode === "custom" ? "custom" : "every"].i.checked = true;
+  for (const x of [every.i, marks.i, custom.i, size, ranges]) x.addEventListener("input", update);
+  size.addEventListener("focus", () => { every.i.checked = true; update(); });
+  update();
+  const body = el("div", { className: "stamp-form" }, [every.row, marks.row, custom.row, ranges, summary]);
+  const p = showDialog({ title: "Split into several files", body, buttons: [{ label: "Cancel", value: false }, { label: "Split", value: true, primary: true }] });
+  const form = body.closest("form") as any;
+  if (form) form._validate = () => { try { plan(); return true; } catch (e: any) { summary.textContent = e.message; return false; } };
+  if (!(await p) || !doc || doc.pdf !== pdf) return;
+  const parts = plan();
+  localStorage.setItem("leaflark.split", JSON.stringify({ mode: mode(), size: +size.value || 1, ranges: ranges.value }));
+  showLoading("Splitting…");
+  try {
+    const bytes = await currentBytes();
+    const { extractPages } = await organize();
+    const { zip } = await import("./images");
+    const pad = String(parts.length).length;
+    const files: { name: string; data: Uint8Array }[] = [];
+    for (const [k, part] of parts.entries()) {
+      $("#loadingText").textContent = `Splitting… ${k + 1} of ${parts.length}`;
+      files.push({ name: `${base} - ${String(k + 1).padStart(pad, "0")} ${R.fileSafe(part.label)}.pdf`, data: await extractPages(bytes, part.pages, crypt()) });
+    }
+    const single = files.length === 1;
+    const out = single ? files[0].data : zip(files);
+    const name = single ? `${base} (${R.fileSafe(parts[0].label)}).pdf` : `${base} (split).zip`;
+    const a = el("a", { href: URL.createObjectURL(new Blob([out as BlobPart], { type: single ? "application/pdf" : "application/zip" })), download: name }) as HTMLAnchorElement;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+    toast(single ? "Saved 1 file." : `Split into ${files.length} files (saved as a ZIP file).`);
+  } catch (e: any) {
+    toast(`Couldn’t split: ${e?.message ?? e}`, "error");
+  } finally { hideLoading(); }
+}
+
 async function imagesDialog() {
   if (!doc) return;
   const pdf = doc.pdf, n = pdf.numPages, base = doc.name.replace(/\.pdf$/i, "");
@@ -1797,6 +1874,7 @@ on("#miImages", imagesDialog);
 on("#miPresent", startPresentation);
 on("#miPrint", print);
 on("#miExtract", extractDialog);
+on("#miSplit", splitDialog);
 on("#miMerge", () => doc && insertPdfAt(doc.pdf.numPages));
 on("#miSpread", () => { viewer.spreadMode = viewer.spreadMode === 1 ? 0 : 1; });
 on("#miProps", showProperties);

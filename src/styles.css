@@ -323,3 +323,5 @@ body.dark-pages .pdfViewer .page { filter: invert(0.9) hue-rotate(180deg); }
 .outline-row .bm-act svg { width: 14px; height: 14px; }
 .outline-row:hover .bm-act, .outline-row:focus-within .bm-act { opacity: 1; }
 @media (hover: none) { .outline-row .bm-act { opacity: .7; } }
+.chk-lg .split-size { width: 72px; height: 30px; margin: 0 6px; }
+.chk-lg.disabled { opacity: .55; }

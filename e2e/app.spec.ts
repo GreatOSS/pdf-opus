@@ -420,3 +420,17 @@ test("has no automatically detectable accessibility problems", async ({ page }) 
   await page.locator("#miExtract").click();
   await check("dialog");
 });
+
+test("splits a document into several files", async ({ page }) => {
+  await open(page, 5);
+  await page.locator("#btnMore").click();
+  await page.locator("#miSplit").click();
+  await page.getByLabel("Every").check();
+  await page.getByLabel("Pages per file").fill("2");
+  await expect(page.locator("dialog .hint-text")).toHaveText("3 files, saved together in a ZIP file.");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.locator("dialog").getByRole("button", { name: "Split" }).click()]);
+  expect(download.suggestedFilename()).toBe("sample (split).zip");
+  const bytes = Buffer.concat(await (await download.createReadStream()).toArray());
+  expect(bytes.subarray(0, 4).toString("hex")).toBe("504b0304");
+  for (const n of ["sample - 1 pages 1-2.pdf", "sample - 2 pages 3-4.pdf", "sample - 3 pages 5.pdf"]) expect(bytes.includes(Buffer.from(n))).toBe(true);
+});
