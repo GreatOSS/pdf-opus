@@ -194,6 +194,10 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Dark mode pass (newer dialogs)
 - 1280×800, prefers-color-scheme dark, tracemonkey: “Reduce file size” dialog and Redact → “Find & mark” prompt + tool options bar — legible contrast, focus ring visible, buttons consistent, no console errors. No changes needed.
 
+### 2026-09-30 — Keyboard-only pass (W-9)
+- Tab from page start: sidebar resizer → page → link → every form field in reading order (text fields, checkbox group, textarea) → next page; focus ring on all interactive stops. Finding: W-9 fields have no /TU tooltip, so screen readers only get internal names (“topmostSubform[0].Page1[0].f1_01[0]”); pdf.js uses /TU when present. Not fixed (would need labels inferred from nearby text).
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
+- Form fields without a /TU tooltip get no accessible name beyond the internal field name; consider inferring labels from adjacent text.
