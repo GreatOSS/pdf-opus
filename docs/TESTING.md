@@ -279,6 +279,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 - More → “Flatten forms & annotations…”: every widget and markup annotation with a normal appearance is drawn into the page as a form XObject at its Rect (BBox/Matrix mapping per §12.5.5; checkbox state via /AS), then removed; the AcroForm goes when no field is left. Notes, links and attachments stay. f1040: typed a field, ticked a checkbox, drew with the pen, added a note → Flatten → toast “Flattened 199 form fields and 1 annotation.”, no inputs left, note kept; saved: pdfinfo “Form: none”; render shows the tick, the (2-char year) value and the drawing. Undo restores all 75 inputs with the value.
 - Found while testing (existing bug): after drawing with a pdf.js tool, a following page change (rotate, crop, flatten…) couldn't be undone — Ctrl+Z and the Undo button went to pdf.js's stale undo state from the replaced document. The state is now reset on every load. Re-test: draw → rotate → Ctrl+Z → rotation back to 0°, drawing kept. New e2e for both (3 engines) 63/63, unit 65/65.
 
+### 2026-09-30 — Firefox + iPhone (WebKit): redaction, flatten, save (production build)
+- f1040 on `vite preview` (CSP active), Firefox desktop and iPhone 14 touch emulation: typed “Ana Pass” → Redact → Find & mark “Treasury” → Apply 1 redaction → Flatten (“Flattened 199 form fields.”, no inputs left) → Save. Both files: pdfinfo “Form: none”, pdftotext finds “Ana Pass” and no “Treasury”; render shows the black box and the value drawn into the page. No page errors. No changes needed.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; text drawn rotated within the page (not via page rotation) isn't editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.
