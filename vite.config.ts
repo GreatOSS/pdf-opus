@@ -40,7 +40,7 @@ export default defineConfig({
         // OCR (tesseract.js), served locally so scans never leave the device. Loaded only when used.
         { src: "node_modules/tesseract.js/dist/worker.min.js", dest: "ocr", rename: { stripBase: true } },
         { src: "node_modules/tesseract.js-core/tesseract-core*-lstm.wasm.js", dest: "ocr", rename: { stripBase: true } },
-        { src: "node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz", dest: "ocr/lang", rename: { stripBase: true } },
+        { src: "node_modules/@tesseract.js-data/*/4.0.0_best_int/*.traineddata.gz", dest: "ocr/lang", rename: { stripBase: true } },
       ] as any),
     }),
     precache(),

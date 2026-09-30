@@ -10,6 +10,12 @@ import { unsupportedChars } from "./winansi";
 
 /** A recognised word: box and baseline in image pixels (y down); `size` is the line's text height. */
 export interface OcrWord { text: string; x0: number; x1: number; baseline: number; size: number }
+/** OCR languages we ship (all written with WinAnsi letters, so the text layer's standard font covers them). */
+export const OCR_LANGUAGES: [code: string, name: string, locale: string][] = [
+  ["eng", "English", "en"], ["deu", "German", "de"], ["fra", "French", "fr"], ["spa", "Spanish", "es"],
+  ["ita", "Italian", "it"], ["por", "Portuguese", "pt"], ["nld", "Dutch", "nl"],
+];
+
 export interface OcrProgress { page: number; pages: number; status: string; progress: number }
 
 /** Pages whose own text layer is (nearly) empty: likely scans. */
@@ -54,13 +60,13 @@ export function addTextLayer(doc: PDFDocument, pageIndex: number, words: OcrWord
 }
 
 export async function ocrDocument(
-  pdf: PDFDocumentProxy, bytes: Uint8Array, pages: number[], { password = "" }: CryptOptions,
+  pdf: PDFDocumentProxy, bytes: Uint8Array, pages: number[], { password = "", lang = "eng" }: CryptOptions & { lang?: string },
   onProgress: (p: OcrProgress) => void, signal: { cancelled: boolean; abort?: () => void },
 ): Promise<{ bytes: Uint8Array; words: number }> {
   const base = new URL(`${import.meta.env.BASE_URL}ocr/`, location.href).href;
   const { createWorker } = await import("tesseract.js");
   let current = 0;
-  const worker = await createWorker("eng", 1, {
+  const worker = await createWorker(lang, 1, {
     workerPath: `${base}worker.min.js`, corePath: base, langPath: `${base}lang`, gzip: true, cacheMethod: "none",
     logger: (m: { status: string; progress: number }) => onProgress({ page: current, pages: pages.length, status: m.status, progress: m.progress }),
   });

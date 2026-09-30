@@ -12,7 +12,7 @@ Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is
 - **Redact** — mark areas and remove what's underneath from the file for real (not just a black box): text, image pixels and overlapping annotations. “Find & mark” marks every occurrence of a name or number in one go.
 - **Annotate** — highlight text (or freehand), add text, draw, insert images, and sign — draw or type a signature once, keep it on your device, and place it with a click. Annotations are saved as standard PDF annotations that open in Acrobat, Preview, Chrome, Firefox, etc., and stay editable.
 - **Fill forms** — fill AcroForm fields (text, checkboxes, radio buttons, dropdowns) and save the values into the file.
-- **Recognize text (OCR)** — make scanned pages searchable and selectable; runs on your device (English).
+- **Recognize text (OCR)** — make scanned pages searchable and selectable; runs on your device (English, German, French, Spanish, Italian, Portuguese, Dutch).
 - **Reduce file size** — shrink oversized photos and scans (two quality levels, undoable) while text and drawings stay sharp.
 - **Combine & convert** — open or drop several PDFs and JPEG/PNG images at once to combine them into one PDF.
 - **Page numbers & watermarks** — stamped into the page content (correct on rotated pages), with several formats and a cover-page option.

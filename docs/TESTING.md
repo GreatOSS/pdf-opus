@@ -176,6 +176,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — OCR cancel
 - Loading indicator can now show a Cancel button (used by OCR). 3-page scan (W-9 p1–3 at 150 dpi): cancelled during page 2 → first try hung (terminating tesseract's worker never settles the pending `recognize`) → now raced against a cancel promise: “Text recognition cancelled — nothing was changed.” within ~0.3 s, no undo step. Re-running afterwards: 3 pages, 3524 words, ~8 s/page.
 
+### 2026-09-30 — OCR languages
+- OCR dialog has a “Document language” select: English, German, French, Spanish, Italian, Portuguese, Dutch (tesseract best_int data, 0.7–3 MB each, served from /ocr/lang). Default guessed from the browser locale, last choice remembered. fr-FR context → French preselected; generated French invoice scan → 34 words, all accents right (“Élève”, “François Lefèvre”, “Besançon”, “dû”, “€”, “bientôt”) in the rebuilt text layer. unit 41/41, e2e 28/28 (5 engines).
+
 ### Known gaps / next
 - Redaction: inline images (BI…EI) aren't handled yet; JBIG2/CCITT images under a mark are removed whole. Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).

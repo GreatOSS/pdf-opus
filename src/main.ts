@@ -896,17 +896,25 @@ async function ocrDialog() {
   if (doc?.pdf !== pdf) return;
   if (!pages.length) { toast("Every page already has selectable text — no OCR needed."); return; }
   const n = pdf.numPages;
+  const { OCR_LANGUAGES } = await import("./ocr");
+  const saved = localStorage.getItem("leaflark.ocrLang");
+  const guess = OCR_LANGUAGES.find(([, , loc]) => navigator.language.toLowerCase().startsWith(loc))?.[0] ?? "eng";
+  const lang = el("select", { className: "zoom-select", ariaLabel: "Document language" },
+    OCR_LANGUAGES.map(([code, name]) => el("option", { value: code, textContent: name }))) as HTMLSelectElement;
+  lang.value = saved && OCR_LANGUAGES.some(([c]) => c === saved) ? saved : guess;
   const ok = await showDialog({
     title: "Recognize text (OCR)",
-    message: `${pages.length === n ? (n === 1 ? "This page looks" : `All ${n} pages look`) : `${pages.length} of ${n} pages look`} like ${pages.length === 1 ? "a scan" : "scans"} without selectable text. Leaflark can recognize the text so you can search, select and copy it. It runs on this device — nothing is uploaded. The first time, it downloads the English text engine (about 7 MB).`,
+    message: `${pages.length === n ? (n === 1 ? "This page looks" : `All ${n} pages look`) : `${pages.length} of ${n} pages look`} like ${pages.length === 1 ? "a scan" : "scans"} without selectable text. Leaflark can recognize the text so you can search, select and copy it. It runs on this device — nothing is uploaded. The first time, it downloads the text engine and language (up to 7 MB).`,
+    body: el("label", { className: "form-row" }, [el("span", { textContent: "Document language" }), lang]),
     buttons: [{ label: "Cancel", value: false }, { label: "Recognize text", value: true, primary: true }],
   });
   if (!ok) return;
+  localStorage.setItem("leaflark.ocrLang", lang.value);
   let words = 0;
   const signal = { cancelled: false, abort: undefined as undefined | (() => void) };
   const cancel = () => { signal.cancelled = true; signal.abort?.(); };
   const done = await mutatePages("Recognizing text", async (b) => {
-    const r = await (await import("./ocr")).ocrDocument(pdf, b, pages, crypt(), ({ page, pages: total, status, progress }) => {
+    const r = await (await import("./ocr")).ocrDocument(pdf, b, pages, { ...crypt(), lang: lang.value }, ({ page, pages: total, status, progress }) => {
       if (signal.cancelled) return;
       showLoading(page ? `Recognizing text… page ${page} of ${total} (${Math.round(progress * 100)}%)` : `Preparing text recognition… ${status === "loading language traineddata" ? `${Math.round(progress * 100)}%` : ""}`, cancel);
     }, signal).catch((e) => { if (signal.cancelled) throw new Unchanged(); throw e; });
