@@ -125,13 +125,15 @@ $("#app").innerHTML = `
   <button role="menuitem" id="miOpen">Open…</button>
   <button role="menuitem" id="miSaveAs">Save as…</button>
   <button role="menuitem" id="miPrint">Print…</button>
+  <button role="menuitem" id="miImages">Save pages as images…</button>
+  <hr />
+  <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <button role="menuitem" id="miExtract">Extract pages…</button>
   <button role="menuitem" id="miCrop">Crop pages…</button>
-  <button role="menuitem" id="miImages">Save pages as images…</button>
   <button role="menuitem" id="miStamp">Page numbers, headers & watermark…</button>
+  <hr />
   <button role="menuitem" id="miCompress">Reduce file size…</button>
   <button role="menuitem" id="miOcr">Recognize text (OCR)…</button>
-  <button role="menuitem" id="miMerge">Append PDFs or images…</button>
   <hr />
   <button role="menuitem" id="miPresent">Present</button>
   <button role="menuitem" id="miSpread">Two-page view</button>

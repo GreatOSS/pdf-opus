@@ -245,6 +245,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Firefox + WebKit: crop, images, dark pages (production build)
 - Both engines on `vite preview` (CSP active), tracemonkey: Crop → auto → “Cropped 14 pages.”; Save pages as images → all, JPEG → “tracemonkey (images).zip”, `unzip -t` OK for both; Dark pages → filter applied, pages render light-on-dark. No page errors. No changes needed.
 
+### 2026-09-30 — More menu: grouping and short screens
+- The menu had grown to 17 items with one 10-item block mixing file and page tools, and no scrolling: at 700 px tall it just fit, on shorter screens (landscape phones, small iPhones) the bottom items were unreachable. Regrouped (File · Pages · Document tools · View · Info) and capped the height to the viewport with scrolling. Verified: 740×360 touch → menu 48–348 px, scrolls, “Close document” reachable and works; desktop grouping reads cleanly.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Printing renders pages to images (150 dpi); the print dialog and real printers can't be exercised headless; real Safari untested.

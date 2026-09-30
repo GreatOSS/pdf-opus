@@ -135,7 +135,7 @@ body[data-tool="toolText"] .pdfViewer .page, body[data-tool="toolImage"] .pdfVie
 .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.menu { position: fixed; z-index: 50; min-width: 210px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.menu { position: fixed; z-index: 50; min-width: 210px; max-height: calc(100dvh - 60px); overflow-y: auto; overscroll-behavior: contain; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
 .menu button { text-align: left; padding: 8px 12px; border: 0; background: transparent; border-radius: 6px; cursor: pointer; }
 .menu button:hover, .menu button:focus-visible { background: var(--surface-2); outline: none; }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
