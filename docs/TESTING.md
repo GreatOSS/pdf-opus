@@ -203,6 +203,9 @@ Samples used: pdf.js `tracemonkey` paper (14 pages, text), IRS Form 1040 (AcroFo
 ### 2026-09-30 — Find & mark: rotated text
 - Rotated text was skipped. Items are now grouped by text direction and matched in their own frame (so phrases split across rotated items are found too), then mapped back to page space; only slanted/mirrored text is still skipped (toast says so). Hands-on: W-9 “specific instructions” — the vertical sidebar on pages 1 and 2 → “Marked 2 matches on 2 pages”, vertical marks sit on the words → applied, saved → pdftotext: 0 (was 2), neighbours “Print or type.”, “on page 3.” intact. Unit: 90°, 180°, split rotated phrase, mirrored skipped. unit 49/49.
 
+### 2026-09-30 — Firefox: organize pages
+- Firefox (Playwright), tracemonkey 14 pp: thumbnail 2 → Rotate right; thumbnail 3 → Delete key (undoable, no prompt); drag thumbnail 1 onto thumbnail 4 (orig p5); Ctrl+S. App: “of 13”, moved page selected and shown. Saved file: 13 pages; p1 = orig p2 with /Rotate 90; orig p3 gone; order orig 2, 4, 1, 5, … (drop inserts before the target). No console errors. No changes needed.
+
 ### Known gaps / next
 - Redaction: JBIG2/CCITT and inline images under a mark are removed whole (not pixel-erased). Edit text: CJK and other scripts DejaVu Sans lacks are refused with a message; rotated text/pages not editable yet.
 - Print uses the browser’s PDF viewer in a hidden iframe; needs cross-browser verification (dialog not checkable headless in any engine; real Safari untested).
