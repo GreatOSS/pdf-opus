@@ -1,5 +1,7 @@
 # Leaflark
 
+[Open the web app](https://greatoss.github.io/pdf-opus/)
+
 **A fast, private PDF viewer and editor that runs entirely on your device.**
 
 Leaflark opens PDFs locally in your browser (or as an installed app). Nothing is uploaded — your files never leave your machine.
@@ -51,3 +53,7 @@ Leaflark has no server component, analytics or network calls beyond loading its 
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE). Leaflark bundles pdf.js (Apache-2.0), pdf-lib (MIT), tesseract.js with its language data (Apache-2.0), the Great Vibes, Dancing Script and Caveat fonts (SIL OFL 1.1) and DejaVu Sans (Bitstream Vera licence); font licences are in `public/fonts`.
+
+## GitHub Pages
+
+Pushes to `main` run tests and build the app for `/pdf-opus/`, then deploy `dist/` with GitHub Actions. The workflow can also be started manually. PDF documents continue to be processed locally in the browser.
